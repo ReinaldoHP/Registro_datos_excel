@@ -76,7 +76,8 @@ class InvoiceAuditor:
             'VERDE': PatternFill(start_color="99FF99", end_color="99FF99", fill_type="solid"),
             'AZUL': PatternFill(start_color="99CCFF", end_color="99CCFF", fill_type="solid"),
             'ROJO': PatternFill(start_color="FF9999", end_color="FF9999", fill_type="solid"),
-            'AMARILLO': PatternFill(start_color="FFFF99", end_color="FFFF99", fill_type="solid")
+            'AMARILLO': PatternFill(start_color="FFFF99", end_color="FFFF99", fill_type="solid"),
+            'NARANJA': PatternFill(start_color="FFB347", end_color="FFB347", fill_type="solid")
         }
         
         # Variables de las rutas
@@ -137,19 +138,39 @@ class InvoiceAuditor:
         except: pass
 
     def sel_excel(self):
-        path = filedialog.askopenfilename(title="Selecciona el Listado Excel", filetypes=[("Archivos Excel", "*.xlsx")])
+        current = self.xl_file_var.get()
+        init_dir = os.path.dirname(current) if current else None
+        path = filedialog.askopenfilename(
+            title="Selecciona el Listado Excel", 
+            filetypes=[("Archivos Excel", "*.xlsx")], 
+            initialdir=init_dir
+        )
         if path: 
             self.xl_file_var.set(path)
             self.save_config()
 
     def sel_search(self):
-        path = filedialog.askdirectory(title="Selecciona la Carpeta de Soportes")
+        current = self.search_root_var.get()
+        init_dir = current if current else None
+        path = filedialog.askdirectory(
+            title="Selecciona la Carpeta de Soportes", 
+            initialdir=init_dir
+        )
         if path: 
             self.search_root_var.set(path)
             self.save_config()
 
     def sel_save(self):
-        path = filedialog.asksaveasfilename(title="Guardar como", defaultextension=".xlsx", filetypes=[("Archivos Excel", "*.xlsx")])
+        current = self.save_path_var.get()
+        init_dir = os.path.dirname(current) if current else None
+        init_file = os.path.basename(current) if current else None
+        path = filedialog.asksaveasfilename(
+            title="Guardar como", 
+            defaultextension=".xlsx", 
+            filetypes=[("Archivos Excel", "*.xlsx")], 
+            initialdir=init_dir,
+            initialfile=init_file
+        )
         if path: 
             self.save_path_var.set(path)
             self.save_config()
@@ -296,12 +317,23 @@ class InvoiceAuditor:
 
             if final_path:
                 count = 0
+                invalid_pdf = False
                 try:
                     if final_path.suffix.lower() == '.zip':
                         with zipfile.ZipFile(final_path, 'r') as zf:
-                            count = len([f for f in zf.namelist() if f.lower().endswith('.pdf')])
+                            pdf_files = [f for f in zf.namelist() if f.lower().endswith('.pdf')]
+                            count = len(pdf_files)
+                            for f in pdf_files:
+                                fname = Path(f).stem
+                                if "__" in fname or fid not in fname:
+                                    invalid_pdf = True
                     else:
-                        count = len(list(final_path.glob("*.pdf")))
+                        pdf_files = list(final_path.glob("*.pdf"))
+                        count = len(pdf_files)
+                        for f in pdf_files:
+                            fname = f.stem
+                            if "__" in fname or fid not in fname:
+                                invalid_pdf = True
                 except: pass
 
                 # Lógica de Pendientes (Azul): Si el nombre contiene letras/descripción
@@ -313,6 +345,9 @@ class InvoiceAuditor:
                     desc = stem_upper.replace(fid, "").replace("_", " ").replace("-", " ").strip()
                     msg = desc if desc else "PENDIENTE"
                     fill = self.fills['AZUL']
+                elif invalid_pdf:
+                    msg = f"MAL SOPORTADO ({count})"
+                    fill = self.fills['NARANJA']
                 elif count >= 4:
                     msg = "SIN RADICAR"
                     fill = self.fills['VERDE']
