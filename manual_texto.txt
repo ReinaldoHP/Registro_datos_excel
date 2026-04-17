@@ -1,0 +1,361 @@
+MANUAL DE 
+CONFORMACIÓN Y  
+AGRUPAMIENTO DE  LOS 
+SOPORTES DE RADICACI ÓN 
+POR EMPRESA:  
+➢ ADRES  
+➢ COOSALUD  
+➢ SANIDAD MILITAR  
+➢ ASEGURADORAS Y ARL  
+ 
+ 
+ 
+ 
+ADRES  
+ 
+Para la presentación de FURIPS, los soportes de las 
+reclamaciones se deben clasificar y digitalizar en  4 
+grupos  y anexar el archivo XML  así:  
+ 
+1.Factura o documento equivalente de la IPS 
+que prestó el servicio  en formato .pdf , junto con 
+la representación gráfica de la factura 
+electrónica de venta descargada de la página de 
+la Dian.  
+Link de descarga de la representación grafica de la factura de la Dian:  
+https: //catalogo -vpfe.dian.gov.co/User/SearchDocument  
+ 
+Ejemplo:  
+Así debe quedar apilado  
+El archivo .pdf de la  
+factura  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+2.Archivo en formato XML de la factura. Anexar 
+el archivo XML que se encuentra en la unidad de 
+red XMLFacturasElectronicas ( \\172.16.0.14 ), el 
+archivo XML que deben anexar es el que inicia 
+con el nombre ad . Luego cuand o lo copien a la 
+carpeta que están soportando le cambian el 
+nombre según la nomenclatura que exige el 
+Adres el cual el ejemplo esta al final.  
+Ejemplo: este es el archivo que deben tomar de la unidad.  
+ 
+3.Epicrisis o resumen Clínico de atención:  
+Corresponde al conjunto de documentos que soportan 
+la atención. Ejemplo: La hoja de traslado.  
+ La hoja de evolución.  
+ La hoja de referencia y contra referencia.  
+ La hoja de administración de medicamentos.  
+ La hoja de atención de urgencias.  
+ La historia clín ica.  
+ El registro de anestesia.  
+ La fórmula médica.  
+
+  
+ 4.Informe descriptivo policía/aviso a la policía o 
+primera autoridad : INFOPOL.  
+  
+  
+ 5.Factura de material de osteosíntesis:  si durante 
+la atención médica se requiere material de 
+osteosíntesis se deberá aportar la factura del 
+proveedor.  
+Cada uno de los archivos se debe digitalizar de 
+manera independiente, en archivo tipo PDF, los cuales 
+deben ser nombrados de acuerdo con la siguiente 
+estructura : 
+ 
+ 
+Ejemplo: Estos son los archivos que deben de tener cuando hayan 
+terminado de soportar la cuenta médica  (incluyendo la factura del 
+material de osteosíntesis en los casos que haya lugar)  
+
+COOSALUD , SANIDAD MILITAR  
+ 
+Para la presentación de  los soportes de esta empresa 
+se debe apilar y nombrar los archivos según está 
+estipulado en la resolución 2284 de 2023 del 
+ministerio de salud, y estos deben de ir dentro de una 
+carpeta nombrada con el n úmero de la factura.  
+ 
+EJEMPLO:  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ASEGURADORA SOLIDARIA SOAT Y 
+SEGUROS ESCOLARES, AXA COLPATRIA 
+ARL Y MEDICINA PREPAGADA, SEGUROS 
+BOLIVAR SOAT, ZURICH COLOMBIA 
+SEGUROS  
+La radicación de estas empresas se debe hacer por 
+una plataforma que se llama Activa IT y la 
+presentación de los soportes se debe hacer en dos 
+archivos .pdf, un archivo debe ser la factura nombrada 
+con el numero de la factura y el otro archivo apilando 
+el resto de los soportes nombrados  con la siguiente 
+estructura: numero de la factura, raya al piso (_), 
+SOP, raya al piso (_), 1. 
+EJEMPLO:  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+SEGUROS BOLIVAR ARL  
+ 
+Los documentos soportes dentro de la carpeta  deben 
+ir en .pdf nombrados de acuerdo a la nomenclatura 
+indicada por la resolución 2284 de 2023 , excepto  el 
+archivo donde va escanead a la factur a que debe ir 
+nombrado  así: FAC, raya al piso (_), numero de la 
+factura.  
+Ejemplo:  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+SEGUROS DEL ESTADO, HDI SEGUROS 
+(ANTES LIBERTY SEGUROS ), SEGUROS 
+MAPFRE , SURA SOAT , SEGUROS COLMENA  
+ 
+Para la presentación de soportes de estas empresas  
+se hace apilando todos los soportes en un solo archivo 
+.pdf nombrado con el número  de factura.  
+ 
+EJEMPLO:  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+AXA COLPATRIA SEGUROS ESCOLARES  
+ 
+Para la presentación de soportes de esta empresa se 
+hace apilando  3 archivos, uno con la factura, otro con 
+la HC y el ultimo con el resto de los soportes.  
+ 
+EJEMPLO:  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+AXA COLPATRIA SOAT, EQUIDAD SEGUROS  
+ 
+Para la presentación de soportes de estas empresas 
+se hace apilando 4 archivos .pdf, un archivo con la 
+factura, otro con la HC, otro con FURIPS y el ultimo 
+con el reto de soportes.  
+ 
+EJEMPLO:  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+LA PREVISORA  
+ 
+Para la presentación de soportes de esta empresa se 
+hace apilando 6 archivos .pdf, uno con la FACTURA, 
+otro con la HC, otro con la EPICRISIS, otro con el 
+FURIPS, otro con el resto de soportes y el ultimo con 
+la factura de osteosíntesis si la hay.  
+ 
+EJEMPLO:  
+ 
+ 
+ 
+POSITIVA ARL Y SEGUROS ESCOLARES  
+ 
+Para la presentación de  los soportes de esta empresa 
+se debe nombrar los archivos según  la estructura de  
+la resolución 2284 de 2023 del ministerio de salud,  y 
+las abreviaturas enviadas por Conexia . 
+ 
+EJEMPLO:   
+
+Nombre Tipo de Soporte Abreviatura
+ Factura y/o Cuentas de cobro FAC
+ Notificación de devolución NDV
+ Notificación de glosa NDG
+ Formulario de solicitud de reembolso a EPS FSR
+ Relación de pacientes RPA
+ Nota crédito NCD
+ Solicitud de autorización de servicios SAS
+ Autorización de servicios ADS
+ Historia clínica o epicrisis EPI
+ Orden de exámenes TST
+ Orden médica OME
+ Interpretación Médica IME
+ Informe médico y/o quirúrgico DQX
+ Odontograma ODO
+ Administración de medicamentos HAM
+ Planilla de asistencia PAS
+ Fórmulas médicas FME
+ Hoja de gastos HDG
+ Hoja de ayudantía HDA
+ Registro de anestesia RAN
+ Comprobantes de recibo usuarios CRC
+ Documento de identidad asegurado o beneficiario DOC
+ Lista de precios de tecnologías en salud LDP
+ Carnet de afiliación CDA
+ Relación de gastos de traslado RGT
+ Factura de venta otro responsable FVO
+ Factura de venta superación topes SOAT FAT
+ Formato Único de Reporte de Accidente de Trabajo - FURAT FUR
+ Solicitud de medicamentos no POS SMP
+ Justificación de medicamentos no POS JMP
+ Tirilla de servicios TDS
+ Imágenes diagnosticas IDX
+ Resultados de laboratorio RDL
+ Traslado de ambulancia TDA
+ Procedimientos de enfermería PEN
+ Habeas Data personales y sensibles HBD
+ Respuesta tutela RTU
+ Actas de comité técnico científico ACC
+ Comunicaciones COM
+ Estados de cuenta EDC
+ Resumen de glosa RDG
+ Conciliación CON
+ Resumen de atención u hoja de evolución. HEV
+Resultados de los procedimientos de apoyo diagnostico PDX
+Traslado asistencial de paciente TAP
+Transporte no asistencial ambulatorio de personas TNA
+Factura venta material de osteosintesis FMO
+Orden o prescripcion facultativa OPF
+Hoja de atención urgencia HAU
+Hoja de atención odontológica HAO
+Evidencia del envío del trámite PDE
+Pólizas POL
+Tabla de pólizas TPO
+MUNDIAL DE SEGUROS  
+ 
+Para la presentación de soportes de esta empresa se 
+hace apilando 3 archivos .pdf, uno con la factura 
+nombrándola con el número  de factura, otro con el 
+FURIPS y el ultimo con el resto de soportes.  
+ 
+EJEMPLO:  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+SURA EPS Y MEDICINA PREPAGADA, S URA 
+ARL 
+ 
+Para la presentación de soportes de estas empresas 
+se hace de una manera especial.  
+1. El archivo .pdf de la factura se nombra con el 
+número  del nit del hospital sin digito de 
+verificación, dos raya al piso  (_ _), numero de 
+la factura.  
+EJEMPLO:  
+ 
+ 
+ 
+2. El resto de soportes  van nombrados y 
+apilados según la resolución 2284 de 2023 
+del ministerio de salud , y estos deben de 
+ir dentro de una carpeta nombrada de la 
+misma forma como se nombró  el archivo 
+.pdf de la factura, el nit del hospital, dos 
+raya al piso  (_ _), numero de la factura.  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+EJEMPLO:  
+ 
+Los soportes  dentro de la carpeta:  
+ 
+Como debe quedar la carpeta con los soportes : 
+ 
+ 
+ 
+
