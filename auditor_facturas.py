@@ -95,6 +95,7 @@ class InvoiceAuditor(ctk.CTk):
             "General",
             "ADRES",
             "COOSALUD / SANIDAD MILITAR",
+            "COLSANITAS (PREPAGADA)",
             "GRUPO SOLIDARIA (Solidaria, Axa ARL, Bolivar SOAT, Zurich)",
             "SEGUROS BOLIVAR ARL",
             "GRUPO ESTADO (Estado, HDI, Mapfre, Sura SOAT, Colmena)",
@@ -290,7 +291,7 @@ class InvoiceAuditor(ctk.CTk):
         ids_list = [fid for fid in ids_to_search if fid]
         
         if not ids_list: return {}
-        print(f"🚀 Generando mapeo directo para {len(ids_list)} facturas del Excel...")
+        print(f"[INFO] Generando mapeo directo para {len(ids_list)} facturas del Excel...")
         
         for root, dirs, files in os.walk(base_path):
             current_dir = Path(root)
@@ -314,7 +315,7 @@ class InvoiceAuditor(ctk.CTk):
             if index[fid]:
                 found_count += 1
                 if fid in ["2127662", "2127695", "2127758"]:
-                    print(f"✅ DEBUG - Carpeta encontrada para {fid}: {index[fid]}")
+                    print(f"[DEBUG] Carpeta encontrada para {fid}: {index[fid]}")
         return index
 
     def audit_process(self):
@@ -340,14 +341,17 @@ class InvoiceAuditor(ctk.CTk):
 
         col_idx = None
         col_total_idx = None
+        idx_obs = None
         for col_num in range(1, ws.max_column + 1):
             val = ws.cell(row=1, column=col_num).value
             if val:
-                val_upper = str(val).upper()
+                val_upper = str(val).upper().strip()
                 if 'SFANUMFAC' in val_upper:
                     col_idx = col_num
                 if 'TOTAL_FACTURADO' in val_upper:
                     col_total_idx = col_num
+                if 'RESULTADO_AUDITORIA' == val_upper:
+                    idx_obs = col_num
 
         if not col_idx:
             messagebox.showerror("Error", "No se encontró la columna 'SFANUMFAC'.")
@@ -362,10 +366,44 @@ class InvoiceAuditor(ctk.CTk):
                     fid = self._extract_id(val)
                     if fid: excel_ids.add(fid)
         
-        dir_map = self.build_native_index(search_root, excel_ids)
+        empresa = self.empresa_var.get()
+        col_facturas_pdfs = []
+        col_soportes_pdfs = []
+        col_zip_facturas_pdfs = []
+        col_zip_soportes_pdfs = []
+        
+        if empresa == "COLSANITAS (PREPAGADA)":
+            dir_map = {}
+            for root, dirs, files in os.walk(search_root):
+                current_dir = Path(root)
+                parts_upper = [p.upper() for p in current_dir.parts]
+                has_fac_dir = any(p in parts_upper for p in ["FACTURAS", "FACTURA"])
+                has_sop_dir = any(p in parts_upper for p in ["SOPORTES", "SOPORTE"])
+                for f in files:
+                    f_lower = f.lower()
+                    if f_lower.endswith('.pdf'):
+                        if has_fac_dir:
+                            col_facturas_pdfs.append(current_dir / f)
+                        elif has_sop_dir:
+                            col_soportes_pdfs.append(current_dir / f)
+                    elif f_lower.endswith('.zip'):
+                        try:
+                            with zipfile.ZipFile(current_dir / f, 'r') as zf:
+                                for member in zf.namelist():
+                                    if member.lower().endswith('.pdf'):
+                                        member_parts = [p.upper() for p in Path(member).parts]
+                                        if any(p in member_parts for p in ["FACTURAS", "FACTURA"]):
+                                            col_zip_facturas_pdfs.append((current_dir / f, member))
+                                        elif any(p in member_parts for p in ["SOPORTES", "SOPORTE"]):
+                                            col_zip_soportes_pdfs.append((current_dir / f, member))
+                        except:
+                            pass
+        else:
+            dir_map = self.build_native_index(search_root, excel_ids)
 
-        idx_obs = ws.max_column + 1
-        ws.cell(row=1, column=idx_obs).value = "RESULTADO_AUDITORIA"
+        if not idx_obs:
+            idx_obs = ws.max_column + 1
+            ws.cell(row=1, column=idx_obs).value = "RESULTADO_AUDITORIA"
 
         for i in range(2, ws.max_row + 1):
             if ws.row_dimensions[i].hidden:
@@ -408,37 +446,61 @@ class InvoiceAuditor(ctk.CTk):
             fill = self.fills['ROJO']
             msg = "NO CARPETA"
 
-            if final_path:
-                empresa = self.empresa_var.get()
+            if empresa == "COLSANITAS (PREPAGADA)":
+                clean_fid = fid.upper().strip().lstrip('0')
+                
+                # Check for matching invoice file in FACTURAS (stem must contain clean_fid)
+                has_fac_pdf = any(clean_fid in p.stem.upper() for p in col_facturas_pdfs)
+                has_fac_zip = any(clean_fid in Path(m).stem.upper() for z, m in col_zip_facturas_pdfs)
+                has_fac = has_fac_pdf or has_fac_zip
+                
+                # Check for matching support file in SOPORTES (stem must contain clean_fid and 'SOP')
+                has_sop_pdf = any(clean_fid in p.stem.upper() and 'SOP' in p.stem.upper() for p in col_soportes_pdfs)
+                has_sop_zip = any(clean_fid in Path(m).stem.upper() and 'SOP' in Path(m).stem.upper() for z, m in col_zip_soportes_pdfs)
+                has_sop = has_sop_pdf or has_sop_zip
+                
+                if has_fac and has_sop:
+                    msg = "SIN RADICAR"
+                    fill = self.fills['VERDE']
+                elif has_fac or has_sop:
+                    msg = "FALTAN SOPORTES"
+                    fill = self.fills['AMARILLO']
+                else:
+                    msg = "NO CARPETA"
+                    fill = self.fills['ROJO']
+            elif final_path:
                 count = 0
                 invalid_count = 0
                 pdf_files_list = []
                 xml_count = 0
                 
+                is_policia = "POLICIA" in [p.upper() for p in final_path.parts]
+                
                 try:
                     if final_path.suffix.lower() == '.zip':
                         with zipfile.ZipFile(final_path, 'r') as zf:
-                            pdf_files_list = [f for f in zf.namelist() if f.lower().endswith('.pdf') and not Path(f).name.upper().startswith('DLP_')]
+                            pdf_files_list = [f for f in zf.namelist() if f.lower().endswith('.pdf') and not Path(f).name.upper().startswith('LDP_')]
                             xml_count = len([f for f in zf.namelist() if f.lower().endswith('.xml') or (Path(f).name.lower().startswith('ad') and not f.lower().endswith('.pdf'))])
                     else:
-                        pdf_files_list = [f.name for f in final_path.glob("*.pdf") if not f.name.upper().startswith('DLP_')]
+                        pdf_files_list = [f.name for f in final_path.glob("*.pdf") if not f.name.upper().startswith('LDP_')]
                         xml_count = len([f for f in final_path.iterdir() if f.is_file() and (f.suffix.lower() == '.xml' or (f.name.lower().startswith('ad') and f.suffix.lower() != '.pdf'))])
                     
                     count = len(pdf_files_list)
                     
                     if empresa == "General":
-                        if len(fid) != 7:
-                            invalid_count += 4  # Forza a invalidar si no son 7 dígitos
-                        for fname in pdf_files_list:
-                            name_stem = Path(fname).stem
-                            if "__" in name_stem or fid not in name_stem:
-                                invalid_count += 1
+                        if not is_policia:
+                            if len(fid) != 7:
+                                invalid_count += 4  # Forza a invalidar si no son 7 dígitos
+                            for fname in pdf_files_list:
+                                name_stem = Path(fname).stem
+                                if "__" in name_stem or fid not in name_stem:
+                                    invalid_count += 1
                 except: pass
 
                 stem_upper = final_path.stem.upper()
                 has_letters = any(c.isalpha() for c in stem_upper)
                 
-                if has_letters and "SURA" not in empresa and "FAC_" not in stem_upper:
+                if has_letters and "SURA" not in empresa and "FAC_" not in stem_upper and not is_policia:
                     desc = stem_upper.replace(fid, "").replace("_", " ").replace("-", " ").strip()
                     msg = desc if desc else "PENDIENTE"
                     fill = self.fills['AZUL']

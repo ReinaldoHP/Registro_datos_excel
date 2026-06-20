@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Auditor de Facturas</title>
+    <link rel="stylesheet" href="style.css" />
+    <!-- CDNs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+</head>
+<body>
+    <!-- Login Screen -->
+    <section id="home" class="centered glass">
+    <h2>Auditor de Facturas</h2>
+    <button id="open-login" class="btn-primary">Acceder</button>
+</section>
+
+<!-- Login Modal -->
+<div id="login-modal" class="modal hidden">
+  <div class="content glass">
+    <h2>Acceso al Auditor</h2>
+    <form id="login-form">
+      <input type="text" id="username" placeholder="Usuario" required />
+      <input type="password" id="password" placeholder="Contraseña" required />
+      <button type="submit">Ingresar</button>
+    </form>
+    <p>¿No tienes cuenta? <a href="#" id="show-register">Regístrate</a></p>
+    <p id="login-message" class="error"></p>
+    <button id="close-login" class="btn-secondary">Cancelar</button>
+  </div>
+</div>
+
+    <!-- Main Dashboard (hidden until login) -->
+    <section id="dashboard" class="hidden">
+        <header>
+            <h1>Panel de Auditoría</h1>
+            <button id="logout">Cerrar Sesión</button>
+        </header>
+        <div class="toolbar">
+            <input type="file" id="excel-file" accept=".xlsx,.xls" />
+            <input type="file" id="support-folder" webkitdirectory directory multiple />
+            <select id="company-select">
+                <option value="COLSANITAS">Colsanitas</option>
+                <option value="ADRES">ADRES</option>
+                <option value="POLICIA">Policía</option>
+            </select>
+            <button id="audit-all">Actualizar Todo</button>
+            <button id="download-excel">Descargar Excel</button>
+        </div>
+        <div class="grid-container">
+            <table id="data-grid">
+                <thead>
+                    <tr>
+                        <th>Factura</th>
+                        <th>Total</th>
+                        <th>Resultado</th>
+                        <th>Acciones</th>
+                    </tr>
+                    <tr class="filter-row">
+                        <th><input type="text" class="col-filter" data-col="0" placeholder="Filtrar" /></th>
+                        <th><input type="text" class="col-filter" data-col="1" placeholder="Filtrar" /></th>
+                        <th><input type="text" class="col-filter" data-col="2" placeholder="Filtrar" /></th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Rows will be injected by app.js -->
+                </tbody>
+            </table>
+        </div>
+    </section>
+    <!-- Registro de nuevo usuario -->
+    <section id="register-section" class="centered glass hidden">
+        <h2>Registro</h2>
+        <form id="register-form">
+            <input type="text" id="register-username" placeholder="Usuario" required />
+            <input type="password" id="register-password" placeholder="Contraseña" required />
+            <input type="password" id="register-confirm" placeholder="Confirmar Contraseña" required />
+            <button type="submit">Crear cuenta</button>
+            <p>¿Ya tienes cuenta? <a href="#" id="show-login">Inicia sesión</a></p>
+            <p id="register-message" class="error"></p>
+        </form>
+    </section>
+    <div class="toast-container"></div>
+    <script src="app.js"></script>
+</body>
+</html>

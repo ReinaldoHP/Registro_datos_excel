@@ -1,0 +1,264 @@
+/* style.css - Auditor de Facturas SPA */
+
+/* Variables de colores base */
+:root {
+  --font-family: 'Inter', sans-serif;
+  /* Tema oscuro por defecto */
+  --bg-primary: #0B0F19;
+  --card-bg: #1E293B;
+  --card-border: #334155;
+  --accent-teal: #14B8A6;
+  --accent-green: #10B981;
+  --accent-red: #EF4444;
+  --text-primary: #F1F5F9;
+}
+
+/* Tema claro */
+[data-theme="light"] {
+  --bg-primary: #F5F7FA;
+  --card-bg: #FFFFFF;
+  --card-border: #D1D5DB;
+  --accent-teal: #0D9488;
+  --accent-green: #059669;
+  --accent-red: #DC2626;
+  --text-primary: #1F2937;
+}
+
+/* Reset y tipografía */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+/* Utilidad para centrar */
+.centered {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  width: 100%;
+  max-width: 420px;
+}
+
+/* Glassmorphism */
+.glass {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 2rem;
+}
+
+h1 {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  color: var(--accent-teal);
+}
+
+input, select, button {
+  font-family: var(--font-family);
+  font-size: 1rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 6px;
+  border: none;
+}
+
+input, select {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  width: 100%;
+}
+
+button {
+  background: var(--accent-teal);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+  border-radius: 6px;
+  padding: 0.6rem 1rem;
+  font-weight: 500;
+}
+
+/* Primary button */
+.btn-primary {
+  background: var(--accent-green);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.6rem 1.2rem;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.2s, transform 0.1s;
+}
+.btn-primary:hover { background: var(--accent-teal); }
+
+/* Secondary button */
+.btn-secondary {
+  background: transparent;
+  color: var(--text-primary);
+  border: 2px solid var(--accent-teal);
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.2s, color 0.2s;
+}
+.btn-secondary:hover { background: var(--accent-teal); color: #fff; }
+
+/* Modal overlay */
+.modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.4);
+  z-index: 1000;
+}
+.modal.hidden { display: none; }
+
+/* Modal content wrapper */
+.modal .content {
+  width: 90%;
+  max-width: 360px;
+  padding: 2rem;
+}
+
+
+button:hover {
+  background: var(--accent-green);
+}
+
+button:active {
+  transform: scale(0.97);
+}
+
+.error {
+  color: var(--accent-red);
+  font-size: 0.9rem;
+}
+
+/* Dashboard */
+#dashboard {
+  width: 100%;
+  max-width: 1200px;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+  align-items: center;
+}
+
+.toolbar-item {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.9rem;
+}
+
+#grid-container {
+  overflow-x: auto;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+}
+
+#data-grid {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--card-bg);
+}
+
+#data-grid th, #data-grid td {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--card-border);
+  text-align: left;
+}
+
+#data-grid th {
+  background: rgba(255, 255, 255, 0.05);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+/* Fila de filtros */
+#filter-row input {
+  width: 100%;
+  padding: 0.4rem;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-primary);
+  border-radius: 4px;
+}
+
+/* Acción eliminar */
+.action-delete {
+  cursor: pointer;
+  color: var(--accent-red);
+  font-weight: bold;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* Animación de entrada */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+body * {
+  animation: fadeIn 0.3s ease both;
+}
+
+/* Toast notifications */
+.toast-container {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 9999;
+}
+.toast {
+  min-width: 200px;
+  padding: 0.8rem 1rem;
+  border-radius: 6px;
+  color: #fff;
+  animation: fadeIn 0.3s, slideOut 0.3s 2.7s forwards;
+}
+.toast-success { background: var(--accent-green); }
+.toast-error { background: var(--accent-red); }
+@keyframes slideOut {
+  to { opacity: 0; transform: translateX(100%); }
+}
+
+/* Theme toggle button */
+#theme-toggle {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
