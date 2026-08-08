@@ -5,7 +5,7 @@ Proyecto: Auditor de Facturas Excel
 Año: 2026
 ------------------------------------------------------------------------------
 "sistema": "Control de Órdenes de Servicio"
-"version": "2.0.2"
+"version": "2.0.4"
 "desarrollador": "Reinaldo Hurtado"
 ==============================================================================
 """
@@ -20,6 +20,11 @@ from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Font
 import subprocess
 import zipfile
+import io
+try:
+    import PyPDF2
+except ImportError:
+    PyPDF2 = None
 
 # Evitar ventana de cmd
 CREATE_NO_WINDOW = 0x08000000
@@ -71,7 +76,7 @@ class DuplicateSelector(ctk.CTkToplevel):
 class InvoiceAuditor(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("Auditor Factura - Configuración de Reglas (v2.0.2)")
+        self.title("Auditor Factura - Configuración de Reglas (v2.0.4)")
         self.geometry("1000x550")
         self.configure(fg_color="#0F172A") # Fondo principal super oscuro #0F172A (aprox a #111827)
         
@@ -143,7 +148,7 @@ class InvoiceAuditor(ctk.CTk):
         firma_texto = (
             "Autor: Reinaldo Hurtado\n"
             "Sistema: Control de Órdenes de Servicio\n"
-            "Versión: 2.0.2\n"
+            "Versión: 2.0.4\n"
             "Desarrollador: Reinaldo Hurtado\n"
             "Año: 2026"
         )
@@ -155,7 +160,7 @@ class InvoiceAuditor(ctk.CTk):
         self.main_content.grid(row=0, column=1, sticky="nswe", padx=40, pady=30)
         
         # Título Arriba
-        lbl_header = ctk.CTkLabel(self.main_content, text="Auditor Factura - Configuración de Reglas (v2.0.2)", 
+        lbl_header = ctk.CTkLabel(self.main_content, text="Auditor Factura - Configuración de Reglas (v2.0.4)", 
                                   font=ctk.CTkFont(size=14, weight="normal"), text_color="#94A3B8")
         lbl_header.pack(anchor="w", pady=(0, 20))
 
@@ -285,6 +290,49 @@ class InvoiceAuditor(ctk.CTk):
         if match:
             return match.group(1).lstrip('0') or '0'
         return val
+
+    def _extract_fid_from_fev_pdf(self, pdf_bytes):
+        """Lee los bytes de un PDF FEV y extrae el número de factura.
+        Busca el patrón: 'FACTURA ELECTRONICA DE VENTA No.' seguido del número.
+        Retorna el número como string limpio, o None si no lo encuentra.
+        """
+        if PyPDF2 is None:
+            return None
+        try:
+            reader = PyPDF2.PdfReader(io.BytesIO(pdf_bytes))
+            for page in reader.pages:
+                text = page.extract_text() or ""
+                # Normalizar: quitar saltos de línea innecesarios y espacios extra
+                text_clean = re.sub(r'[\r\n]+', ' ', text)
+                match = re.search(
+                    r'FACTURA\s+ELECTR[OÓ]NICA\s+DE\s+VENTA\s+No\.?\s*(\d+)',
+                    text_clean, re.IGNORECASE
+                )
+                if match:
+                    return match.group(1).lstrip('0') or '0'
+        except Exception:
+            pass
+        return None
+
+    def _get_fev_bytes_from_folder(self, folder_path):
+        """Retorna los bytes del primer FEV PDF encontrado en una carpeta."""
+        for f in folder_path.glob("FEV_*.pdf"):
+            try:
+                return f.read_bytes()
+            except Exception:
+                pass
+        return None
+
+    def _get_fev_bytes_from_zip(self, zip_path):
+        """Retorna los bytes del primer FEV PDF encontrado dentro de un ZIP."""
+        try:
+            with zipfile.ZipFile(zip_path, 'r') as zf:
+                for name in zf.namelist():
+                    if Path(name).name.upper().startswith('FEV_') and name.lower().endswith('.pdf'):
+                        return zf.read(name)
+        except Exception:
+            pass
+        return None
 
     def build_native_index(self, base_path, ids_to_search):
         index = {fid: [] for fid in ids_to_search if fid}
@@ -479,16 +527,35 @@ class InvoiceAuditor(ctk.CTk):
                 try:
                     # Auto-corregir el nombre de la carpeta o ZIP si tiene un NIT distinto (para General)
                     if empresa == "General":
-                        folder_match = re.match(rf'^(\d+)[\s\-_]+({fid})$', final_path.stem, re.IGNORECASE)
-                        if folder_match and folder_match.group(1) != "800218979":
-                            new_stem = f"800218979_{fid}"
-                            new_folder_name = new_stem + final_path.suffix
-                            new_path = final_path.with_name(new_folder_name)
-                            try:
-                                os.rename(final_path, new_path)
-                                final_path = new_path
-                            except Exception:
-                                pass
+                        folder_match = re.match(rf'^(\d+)[\s\-_]+(\d+)$', final_path.stem, re.IGNORECASE)
+                        if folder_match:
+                            nit_en_nombre = folder_match.group(1)
+                            fid_en_nombre = folder_match.group(2)
+
+                            # --- PASO 1: Extraer número real de factura desde el FEV PDF ---
+                            if final_path.suffix.lower() == '.zip':
+                                fev_bytes = self._get_fev_bytes_from_zip(final_path)
+                            else:
+                                fev_bytes = self._get_fev_bytes_from_folder(final_path)
+
+                            fid_real = self._extract_fid_from_fev_pdf(fev_bytes) if fev_bytes else None
+
+                            # Si el PDF nos dice un número distinto al del nombre → usar el del PDF
+                            if fid_real and fid_real != fid_en_nombre:
+                                fid = fid_real  # Actualizar el fid para el resto de la auditoría
+
+                            # --- PASO 2: Corregir NIT si es incorrecto ---
+                            nit_correcto = "800218979"
+                            if nit_en_nombre != nit_correcto or fid_en_nombre != fid:
+                                new_stem = f"{nit_correcto}_{fid}"
+                                new_folder_name = new_stem + final_path.suffix
+                                new_path = final_path.with_name(new_folder_name)
+                                try:
+                                    os.rename(final_path, new_path)
+                                    final_path = new_path
+                                    print(f"[RENOMBRADO] {folder_match.group(0)} → {new_stem}")
+                                except Exception:
+                                    pass
 
                     if final_path.suffix.lower() == '.zip':
                         zip_modified = False

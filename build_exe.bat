@@ -8,10 +8,13 @@
 :: "desarrollador": "Reinaldo Hurtado"
 :: ==============================================================================
 echo Instalando requerimientos de interfaz...
-C:\Users\reina\AppData\Local\Python\bin\python.exe -m pip install customtkinter
+C:\Users\reina\AppData\Local\Python\bin\python.exe -m pip install customtkinter PyPDF2
 echo.
 echo Actualizando el número de versión (parche)...
 C:\Users\reina\AppData\Local\Python\bin\python.exe incrementar_version.py
+echo.
+echo Cerrando el ejecutable anterior si está en ejecución...
+taskkill /F /IM auditor_facturas.exe >nul 2>&1
 echo.
 echo Construyendo el ejecutable de auditor_facturas...
 C:\Users\reina\AppData\Local\Python\bin\python.exe -m PyInstaller auditor_facturas.spec
