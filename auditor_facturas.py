@@ -482,6 +482,18 @@ class InvoiceAuditor(ctk.CTk):
                             pdf_files_list = [f for f in zf.namelist() if f.lower().endswith('.pdf') and not Path(f).name.upper().startswith('LDP_')]
                             xml_count = len([f for f in zf.namelist() if f.lower().endswith('.xml') or (Path(f).name.lower().startswith('ad') and not f.lower().endswith('.pdf'))])
                     else:
+                        # Auto-corregir nombres de archivos PDF con espacios o guiones
+                        for f in final_path.glob("*.pdf"):
+                            # Exigimos que el último número sea exactamente el número de factura (fid)
+                            match = re.match(rf'^([A-Za-z]{{3}})[\s\-_]+(\d+)[\s\-_]+({fid})(\.pdf)$', f.name, re.IGNORECASE)
+                            if match:
+                                new_name = f"{match.group(1).upper()}_{match.group(2)}_{match.group(3)}.pdf"
+                                if new_name != f.name:
+                                    try:
+                                        os.rename(f, final_path / new_name)
+                                    except Exception:
+                                        pass
+
                         pdf_files_list = [f.name for f in final_path.glob("*.pdf") if not f.name.upper().startswith('LDP_')]
                         xml_count = len([f for f in final_path.iterdir() if f.is_file() and (f.suffix.lower() == '.xml' or (f.name.lower().startswith('ad') and f.suffix.lower() != '.pdf'))])
                     
