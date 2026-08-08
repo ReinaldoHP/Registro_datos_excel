@@ -10,6 +10,9 @@
 echo Instalando requerimientos de interfaz...
 C:\Users\reina\AppData\Local\Python\bin\python.exe -m pip install customtkinter
 echo.
+echo Actualizando el número de versión (parche)...
+C:\Users\reina\AppData\Local\Python\bin\python.exe incrementar_version.py
+echo.
 echo Construyendo el ejecutable de auditor_facturas...
 C:\Users\reina\AppData\Local\Python\bin\python.exe -m PyInstaller auditor_facturas.spec
 echo Proceso finalizado. Puedes encontrar tu nuevo ejecutable en la carpeta 'dist'.

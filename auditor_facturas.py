@@ -5,7 +5,7 @@ Proyecto: Auditor de Facturas Excel
 Año: 2026
 ------------------------------------------------------------------------------
 "sistema": "Control de Órdenes de Servicio"
-"version": "2.0"
+"version": "2.0.2"
 "desarrollador": "Reinaldo Hurtado"
 ==============================================================================
 """
@@ -71,7 +71,7 @@ class DuplicateSelector(ctk.CTkToplevel):
 class InvoiceAuditor(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("Auditor Factura - Configuración de Reglas (v2.0)")
+        self.title("Auditor Factura - Configuración de Reglas (v2.0.2)")
         self.geometry("1000x550")
         self.configure(fg_color="#0F172A") # Fondo principal super oscuro #0F172A (aprox a #111827)
         
@@ -143,7 +143,7 @@ class InvoiceAuditor(ctk.CTk):
         firma_texto = (
             "Autor: Reinaldo Hurtado\n"
             "Sistema: Control de Órdenes de Servicio\n"
-            "Versión: 2.0\n"
+            "Versión: 2.0.2\n"
             "Desarrollador: Reinaldo Hurtado\n"
             "Año: 2026"
         )
@@ -155,7 +155,7 @@ class InvoiceAuditor(ctk.CTk):
         self.main_content.grid(row=0, column=1, sticky="nswe", padx=40, pady=30)
         
         # Título Arriba
-        lbl_header = ctk.CTkLabel(self.main_content, text="Auditor Factura - Configuración de Reglas (v2.0)", 
+        lbl_header = ctk.CTkLabel(self.main_content, text="Auditor Factura - Configuración de Reglas (v2.0.2)", 
                                   font=ctk.CTkFont(size=14, weight="normal"), text_color="#94A3B8")
         lbl_header.pack(anchor="w", pady=(0, 20))
 
@@ -477,17 +477,70 @@ class InvoiceAuditor(ctk.CTk):
                 is_policia = "POLICIA" in [p.upper() for p in final_path.parts]
                 
                 try:
+                    # Auto-corregir el nombre de la carpeta o ZIP si tiene un NIT distinto (para General)
+                    if empresa == "General":
+                        folder_match = re.match(rf'^(\d+)[\s\-_]+({fid})$', final_path.stem, re.IGNORECASE)
+                        if folder_match and folder_match.group(1) != "800218979":
+                            new_stem = f"800218979_{fid}"
+                            new_folder_name = new_stem + final_path.suffix
+                            new_path = final_path.with_name(new_folder_name)
+                            try:
+                                os.rename(final_path, new_path)
+                                final_path = new_path
+                            except Exception:
+                                pass
+
                     if final_path.suffix.lower() == '.zip':
+                        zip_modified = False
+                        temp_zip_path = final_path.with_name(final_path.name + '.tmp')
+                        try:
+                            with zipfile.ZipFile(final_path, 'r') as zf_in:
+                                rename_map = {}
+                                for f in zf_in.namelist():
+                                    path_obj = Path(f)
+                                    if path_obj.suffix.lower() == '.pdf':
+                                        match = re.match(rf'^([A-Za-z]{{3}})[\s\-_]+(\d+)[\s\-_]+(\d+)(\.pdf)$', path_obj.name, re.IGNORECASE)
+                                        if match:
+                                            nit_a_usar = "800218979" if empresa == "General" else match.group(2)
+                                            new_name = f"{match.group(1).upper()}_{nit_a_usar}_{fid}.pdf"
+                                            if new_name != path_obj.name:
+                                                new_full_path = str(path_obj.with_name(new_name)).replace('\\', '/')
+                                                rename_map[f] = new_full_path
+                                
+                                if rename_map:
+                                    with zipfile.ZipFile(temp_zip_path, 'w') as zf_out:
+                                        for item in zf_in.infolist():
+                                            old_name = item.filename
+                                            new_name = rename_map.get(old_name, old_name)
+                                            content = zf_in.read(old_name)
+                                            item.filename = new_name
+                                            zf_out.writestr(item, content)
+                                    zip_modified = True
+                        except Exception:
+                            pass
+                            
+                        if zip_modified:
+                            try:
+                                os.remove(final_path)
+                                os.rename(temp_zip_path, final_path)
+                            except Exception:
+                                pass
+                        elif temp_zip_path.exists():
+                            try:
+                                os.remove(temp_zip_path)
+                            except:
+                                pass
+
                         with zipfile.ZipFile(final_path, 'r') as zf:
                             pdf_files_list = [f for f in zf.namelist() if f.lower().endswith('.pdf') and not Path(f).name.upper().startswith('LDP_')]
                             xml_count = len([f for f in zf.namelist() if f.lower().endswith('.xml') or (Path(f).name.lower().startswith('ad') and not f.lower().endswith('.pdf'))])
                     else:
                         # Auto-corregir nombres de archivos PDF con espacios o guiones
                         for f in final_path.glob("*.pdf"):
-                            # Exigimos que el último número sea exactamente el número de factura (fid)
-                            match = re.match(rf'^([A-Za-z]{{3}})[\s\-_]+(\d+)[\s\-_]+({fid})(\.pdf)$', f.name, re.IGNORECASE)
+                            match = re.match(rf'^([A-Za-z]{{3}})[\s\-_]+(\d+)[\s\-_]+(\d+)(\.pdf)$', f.name, re.IGNORECASE)
                             if match:
-                                new_name = f"{match.group(1).upper()}_{match.group(2)}_{match.group(3)}.pdf"
+                                nit_a_usar = "800218979" if empresa == "General" else match.group(2)
+                                new_name = f"{match.group(1).upper()}_{nit_a_usar}_{fid}.pdf"
                                 if new_name != f.name:
                                     try:
                                         os.rename(f, final_path / new_name)
