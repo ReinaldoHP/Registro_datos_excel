@@ -5,7 +5,7 @@ Proyecto: Auditor de Facturas Excel
 Año: 2026
 ------------------------------------------------------------------------------
 "sistema": "Control de Órdenes de Servicio"
-"version": "2.0.4"
+"version": "2.0.6"
 "desarrollador": "Reinaldo Hurtado"
 ==============================================================================
 """
@@ -76,7 +76,7 @@ class DuplicateSelector(ctk.CTkToplevel):
 class InvoiceAuditor(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("Auditor Factura - Configuración de Reglas (v2.0.4)")
+        self.title("Auditor Factura - Configuración de Reglas (v2.0.6)")
         self.geometry("1000x550")
         self.configure(fg_color="#0F172A") # Fondo principal super oscuro #0F172A (aprox a #111827)
         
@@ -104,7 +104,8 @@ class InvoiceAuditor(ctk.CTk):
             "GRUPO SOLIDARIA (Solidaria, Axa ARL, Bolivar SOAT, Zurich)",
             "SEGUROS BOLIVAR ARL",
             "GRUPO ESTADO (Estado, HDI, Mapfre, Sura SOAT, Colmena)",
-            "AXA COLPATRIA SEGURES ESCOLARES / MUNDIAL SEGUROS",
+            "AXA COLPATRIA SEGUROS ESCOLARES",
+            "MUNDIAL DE SEGUROS",
             "AXA COLPATRIA SOAT / EQUIDAD SEGUROS",
             "LA PREVISORA",
             "POSITIVA ARL Y SEGUROS ESCOLARES",
@@ -148,7 +149,7 @@ class InvoiceAuditor(ctk.CTk):
         firma_texto = (
             "Autor: Reinaldo Hurtado\n"
             "Sistema: Control de Órdenes de Servicio\n"
-            "Versión: 2.0.4\n"
+            "Versión: 2.0.6\n"
             "Desarrollador: Reinaldo Hurtado\n"
             "Año: 2026"
         )
@@ -160,7 +161,7 @@ class InvoiceAuditor(ctk.CTk):
         self.main_content.grid(row=0, column=1, sticky="nswe", padx=40, pady=30)
         
         # Título Arriba
-        lbl_header = ctk.CTkLabel(self.main_content, text="Auditor Factura - Configuración de Reglas (v2.0.4)", 
+        lbl_header = ctk.CTkLabel(self.main_content, text="Auditor Factura - Configuración de Reglas (v2.0.6)", 
                                   font=ctk.CTkFont(size=14, weight="normal"), text_color="#94A3B8")
         lbl_header.pack(anchor="w", pady=(0, 20))
 
@@ -632,7 +633,7 @@ class InvoiceAuditor(ctk.CTk):
                 stem_upper = final_path.stem.upper()
                 has_letters = any(c.isalpha() for c in stem_upper)
                 
-                if has_letters and "SURA" not in empresa and "FAC_" not in stem_upper and not is_policia:
+                if has_letters and "SURA" not in empresa and "FAC_" not in stem_upper:
                     desc = stem_upper.replace(fid, "").replace("_", " ").replace("-", " ").strip()
                     msg = desc if desc else "PENDIENTE"
                     fill = self.fills['AZUL']
@@ -686,12 +687,19 @@ class InvoiceAuditor(ctk.CTk):
                         else:
                             msg = f"ERROR APILAMIENTO ({count})"
                             fill = self.fills['AMARILLO']
-                    elif "ESCOLARES / MUNDIAL" in empresa:
-                        if count >= 3:
+                    elif "AXA COLPATRIA SEGUROS ESCOLARES" in empresa:
+                        if count == 3:
                             msg = "SIN RADICAR (3 docs)"
                             fill = self.fills['VERDE']
                         else:
                             msg = f"FALTAN SOPORTES ({count}/3)"
+                            fill = self.fills['AMARILLO']
+                    elif "MUNDIAL" in empresa:
+                        if count == 1:
+                            msg = "SIN RADICAR (1 solo doc)"
+                            fill = self.fills['VERDE']
+                        else:
+                            msg = f"ERROR APILAMIENTO ({count})"
                             fill = self.fills['AMARILLO']
                     elif "SOAT / EQUIDAD" in empresa:
                         if count >= 4:
@@ -701,11 +709,17 @@ class InvoiceAuditor(ctk.CTk):
                             msg = f"FALTAN SOPORTES ({count}/4)"
                             fill = self.fills['AMARILLO']
                     elif empresa == "LA PREVISORA":
-                        if count >= 5:
-                            msg = "SIN RADICAR (5+ docs)"
+                        has_fev = any("FEV" in f.upper() for f in pdf_files_list)
+                        has_epi = any("EPI" in f.upper() for f in pdf_files_list)
+                        has_pdx = any("PDX" in f.upper() for f in pdf_files_list)
+                        if count == 3 and has_fev and has_epi and has_pdx:
+                            msg = "SIN RADICAR (3 docs)"
                             fill = self.fills['VERDE']
+                        elif count == 3:
+                            msg = "NOMENCLATURA INCORRECTA"
+                            fill = self.fills['AMARILLO']
                         else:
-                            msg = f"FALTAN SOPORTES ({count}/6)"
+                            msg = f"FALTAN SOPORTES ({count}/3)"
                             fill = self.fills['AMARILLO']
                     elif "POSITIVA" in empresa:
                         if count >= 3:
