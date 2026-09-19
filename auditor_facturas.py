@@ -5,7 +5,7 @@ Proyecto: Auditor de Facturas Excel
 Año: 2026
 ------------------------------------------------------------------------------
 "sistema": "Control de Órdenes de Servicio"
-"version": "2.0.6"
+"version": "2.0.11"
 "desarrollador": "Reinaldo Hurtado"
 ==============================================================================
 """
@@ -76,7 +76,7 @@ class DuplicateSelector(ctk.CTkToplevel):
 class InvoiceAuditor(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("Auditor Factura - Configuración de Reglas (v2.0.6)")
+        self.title("Auditor Factura - Configuración de Reglas (v2.0.11)")
         self.geometry("1000x550")
         self.configure(fg_color="#0F172A") # Fondo principal super oscuro #0F172A (aprox a #111827)
         
@@ -86,7 +86,9 @@ class InvoiceAuditor(ctk.CTk):
             'ROJO': PatternFill(start_color="FF9999", end_color="FF9999", fill_type="solid"),
             'AMARILLO': PatternFill(start_color="FFFF99", end_color="FFFF99", fill_type="solid"),
             'NARANJA': PatternFill(start_color="FFB347", end_color="FFB347", fill_type="solid"),
-            'MORADO': PatternFill(start_color="DDA0DD", end_color="DDA0DD", fill_type="solid") # Ciruela/Morado claro
+            'MORADO': PatternFill(start_color="DDA0DD", end_color="DDA0DD", fill_type="solid"), # Ciruela/Morado claro
+            'MARRON_CLARO': PatternFill(start_color="D2B48C", end_color="D2B48C", fill_type="solid"),
+            'ROSADO': PatternFill(start_color="FFC0CB", end_color="FFC0CB", fill_type="solid")
         }
         self.font_roja = Font(color="FF0000")
         
@@ -149,7 +151,7 @@ class InvoiceAuditor(ctk.CTk):
         firma_texto = (
             "Autor: Reinaldo Hurtado\n"
             "Sistema: Control de Órdenes de Servicio\n"
-            "Versión: 2.0.6\n"
+            "Versión: 2.0.11\n"
             "Desarrollador: Reinaldo Hurtado\n"
             "Año: 2026"
         )
@@ -161,7 +163,7 @@ class InvoiceAuditor(ctk.CTk):
         self.main_content.grid(row=0, column=1, sticky="nswe", padx=40, pady=30)
         
         # Título Arriba
-        lbl_header = ctk.CTkLabel(self.main_content, text="Auditor Factura - Configuración de Reglas (v2.0.6)", 
+        lbl_header = ctk.CTkLabel(self.main_content, text="Auditor Factura - Configuración de Reglas (v2.0.11)", 
                                   font=ctk.CTkFont(size=14, weight="normal"), text_color="#94A3B8")
         lbl_header.pack(anchor="w", pady=(0, 20))
 
@@ -495,7 +497,30 @@ class InvoiceAuditor(ctk.CTk):
             fill = self.fills['ROJO']
             msg = "NO CARPETA"
 
-            if empresa == "COLSANITAS (PREPAGADA)":
+            es_ubicacion_equivocada = False
+            if final_path:
+                partes = [p.upper() for p in final_path.parts]
+                empresa_clave = empresa.split('/')[0].split('(')[0].strip().upper()
+                
+                tiene_consulta_externa = any("CONSULTA EXTERNA" in p for p in partes)
+                tiene_pendientes = any("PENDIENTE" in p for p in partes)
+                has_letters_in_name = any(c.isalpha() for c in final_path.stem)
+                
+                if has_letters_in_name:
+                    ubicacion_correcta = tiene_pendientes
+                else:
+                    ubicacion_correcta = tiene_consulta_externa
+                    
+                if not ubicacion_correcta:
+                    es_ubicacion_equivocada = True
+
+            if not final_path and matches and len(matches) > 1:
+                msg = "DUPLICADO"
+                fill = self.fills['MORADO']
+            elif es_ubicacion_equivocada:
+                msg = "UBICACIÓN EQUIVOCADA"
+                fill = self.fills['MARRON_CLARO']
+            elif empresa == "COLSANITAS (PREPAGADA)":
                 clean_fid = fid.upper().strip().lstrip('0')
                 
                 # Check for matching invoice file in FACTURAS (stem must contain clean_fid)
@@ -621,9 +646,11 @@ class InvoiceAuditor(ctk.CTk):
                     count = len(pdf_files_list)
                     
                     if empresa == "General":
+                        is_previsora = "PREVISORA" in str(final_path).upper()
+                        required_count = 3 if is_previsora else 4
                         if not is_policia:
                             if len(fid) != 7:
-                                invalid_count += 4  # Forza a invalidar si no son 7 dígitos
+                                invalid_count += required_count  # Forza a invalidar si no son 7 dígitos
                             for fname in pdf_files_list:
                                 name_stem = Path(fname).stem
                                 if "__" in name_stem or fid not in name_stem:
@@ -637,16 +664,18 @@ class InvoiceAuditor(ctk.CTk):
                     desc = stem_upper.replace(fid, "").replace("_", " ").replace("-", " ").strip()
                     msg = desc if desc else "PENDIENTE"
                     fill = self.fills['AZUL']
-                elif invalid_count > 0 and empresa == "General":
-                    msg = f"MAL SOPORTADO ({invalid_count}/4)"
-                    fill = self.fills['NARANJA']
                 else:
                     if empresa == "General":
-                        if count >= 4:
+                        is_previsora = "PREVISORA" in str(final_path).upper()
+                        required_count = 3 if is_previsora else 4
+                        if invalid_count > 0:
+                            msg = f"MAL SOPORTADO ({invalid_count}/{required_count})"
+                            fill = self.fills['NARANJA']
+                        elif count >= required_count:
                             msg = "SIN RADICAR"
                             fill = self.fills['VERDE']
                         else:
-                            msg = f"FALTAN SOPORTES ({count}/4)"
+                            msg = f"FALTAN SOPORTES ({count}/{required_count})"
                             fill = self.fills['AMARILLO']
                     elif empresa == "ADRES":
                         if count >= 3 and xml_count > 0:
@@ -755,14 +784,23 @@ class InvoiceAuditor(ctk.CTk):
                     pass
 
             if is_sobre_costo:
-                msg = "SOBRE COSTO"
-                fill = self.fills['MORADO']
+                if "DUPLICADO" in msg:
+                    pass # Se mantiene MORADO claro
+                elif fill in (self.fills['VERDE'], self.fills['AZUL']):
+                    fill = self.fills['VERDE']
+                elif fill in (self.fills['AMARILLO'], self.fills['NARANJA']):
+                    fill = self.fills['AMARILLO']
+                else:
+                    fill = self.fills['ROSADO']
+                msg = f"SOBRE COSTO - {msg}"
 
             for c in range(1, idx_obs + 1):
                 cell = ws.cell(row=i, column=c)
                 cell.fill = fill
-                if is_sobre_costo:
+                if is_sobre_costo and "DUPLICADO" not in msg:
                     cell.font = self.font_roja
+                else:
+                    cell.font = Font(color="000000")
             ws.cell(row=i, column=idx_obs).value = msg
 
         if save_path:
