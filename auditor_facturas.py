@@ -74,6 +74,13 @@ class DuplicateSelector(ctk.CTkToplevel):
 
 
 class InvoiceAuditor(ctk.CTk):
+    NUEVA_EPS_TIPOS_PERMITIDOS = {
+        "FEV", "HEV", "EPI", "PDX", "DQX", "RAN",
+        "TAP", "FMO", "OPF", "LDP", "HAU", "HAM", "PDE",
+    }
+    NUEVA_EPS_REQUERIDOS = {"FEV", "OPF", "PDE", "LDP"}
+    NUEVA_EPS_NO_CUENTA = {"LDP"}
+
     def __init__(self):
         super().__init__()
         self.title("Auditor Factura - Configuración de Reglas (v2.0.11)")
@@ -111,7 +118,8 @@ class InvoiceAuditor(ctk.CTk):
             "AXA COLPATRIA SOAT / EQUIDAD SEGUROS",
             "LA PREVISORA",
             "POSITIVA ARL Y SEGUROS ESCOLARES",
-            "SURA EPS / SURA ARL"
+            "SURA EPS / SURA ARL",
+            "NUEVA EPS"
         ]
 
         self.config_file = Path(__file__).parent / "auditor_config.json"
@@ -294,6 +302,62 @@ class InvoiceAuditor(ctk.CTk):
             return match.group(1).lstrip('0') or '0'
         return val
 
+    @staticmethod
+    def _is_wrong_invoice_location(invoice_path):
+        path_parts = [part.upper() for part in invoice_path.parts]
+        has_letters_in_name = any(char.isalpha() for char in invoice_path.stem)
+        if has_letters_in_name:
+            return not any("PENDIENTE" in part for part in path_parts)
+        return not any("CONSULTA EXTERNA" in part for part in path_parts)
+
+    @staticmethod
+    def _pending_invoice_description(invoice_path, invoice_id):
+        description = invoice_path.stem.upper().replace(invoice_id, "")
+        description = description.replace("_", " ").replace("-", " ").strip()
+        return description or "PENDIENTE"
+
+    @staticmethod
+    def _get_exact_invoice_folders(matches, invoice_id):
+        return [
+            path for path in matches
+            if path.stem.upper().strip() == invoice_id
+        ]
+
+    @classmethod
+    def _validate_nueva_eps_pdfs(cls, pdf_names, invoice_id):
+        invoice_id = str(invoice_id).lstrip('0') or '0'
+        valid_supports = set()
+        invalid_count = 0
+
+        for filename in pdf_names:
+            basename = str(filename).replace("\\", "/").rsplit("/", 1)[-1]
+            match = re.fullmatch(
+                r"([A-Z]{3})_(\d+)_(\d+)\.pdf",
+                basename,
+                re.IGNORECASE,
+            )
+            if not match:
+                invalid_count += 1
+                continue
+
+            support_type = match.group(1).upper()
+            file_invoice_id = match.group(3).lstrip('0') or '0'
+            if (support_type not in cls.NUEVA_EPS_TIPOS_PERMITIDOS
+                    or file_invoice_id != invoice_id
+                    or support_type in valid_supports):
+                invalid_count += 1
+                continue
+            valid_supports.add(support_type)
+
+        counted_supports = valid_supports - cls.NUEVA_EPS_NO_CUENTA
+        missing_required = cls.NUEVA_EPS_REQUERIDOS - valid_supports
+        return (
+            len(counted_supports),
+            invalid_count,
+            missing_required,
+            4,
+        )
+
     def _extract_fid_from_fev_pdf(self, pdf_bytes):
         """Lee los bytes de un PDF FEV y extrae el número de factura.
         Busca el patrón: 'FACTURA ELECTRONICA DE VENTA No.' seguido del número.
@@ -472,7 +536,7 @@ class InvoiceAuditor(ctk.CTk):
             final_path = None
             if matches:
                 pendientes = [p for p in matches if ("PENDIENTE" in p.stem.upper() or any(c.isalpha() for c in p.stem))]
-                exact_folders = [p for p in matches if p.stem.upper().strip() == fid]
+                exact_folders = self._get_exact_invoice_folders(matches, fid)
                 prefix_folders = [p for p in matches if (p.stem.upper().strip().startswith(f"{fid}_") or p.stem.upper().strip().startswith(f"{fid} "))]
                 
                 # Sort to prefer directories over files (zips) if both exist
@@ -482,8 +546,11 @@ class InvoiceAuditor(ctk.CTk):
 
                 if pendientes:
                     final_path = pendientes[0]
-                elif exact_folders:
+                elif len(exact_folders) == 1:
                     final_path = exact_folders[0]
+                elif len(exact_folders) > 1:
+                    sel_dialog = DuplicateSelector(self, fid, exact_folders)
+                    final_path = sel_dialog.result
                 elif len(prefix_folders) == 1:
                     final_path = prefix_folders[0]
                 elif len([p for p in matches if p.is_dir()]) == 1:
@@ -499,20 +566,7 @@ class InvoiceAuditor(ctk.CTk):
 
             es_ubicacion_equivocada = False
             if final_path:
-                partes = [p.upper() for p in final_path.parts]
-                empresa_clave = empresa.split('/')[0].split('(')[0].strip().upper()
-                
-                tiene_consulta_externa = any("CONSULTA EXTERNA" in p for p in partes)
-                tiene_pendientes = any("PENDIENTE" in p for p in partes)
-                has_letters_in_name = any(c.isalpha() for c in final_path.stem)
-                
-                if has_letters_in_name:
-                    ubicacion_correcta = tiene_pendientes
-                else:
-                    ubicacion_correcta = tiene_consulta_externa
-                    
-                if not ubicacion_correcta:
-                    es_ubicacion_equivocada = True
+                es_ubicacion_equivocada = self._is_wrong_invoice_location(final_path)
 
             if not final_path and matches and len(matches) > 1:
                 msg = "DUPLICADO"
@@ -542,6 +596,50 @@ class InvoiceAuditor(ctk.CTk):
                 else:
                     msg = "NO CARPETA"
                     fill = self.fills['ROJO']
+            elif (final_path and empresa == "NUEVA EPS"
+                  and any(char.isalpha() for char in final_path.stem)):
+                msg = self._pending_invoice_description(final_path, fid)
+                fill = self.fills['AZUL']
+            elif final_path and empresa == "NUEVA EPS":
+                required_count = 4
+                pdf_names = []
+                zip_error = None
+
+                if final_path.suffix.lower() == '.zip':
+                    try:
+                        with zipfile.ZipFile(final_path, 'r') as zf:
+                            pdf_names = [
+                                name for name in zf.namelist()
+                                if name.lower().endswith('.pdf')
+                            ]
+                    except (OSError, zipfile.BadZipFile) as e:
+                        zip_error = e
+                else:
+                    pdf_names = [
+                        pdf.name for pdf in final_path.glob("*.pdf")
+                        if pdf.is_file()
+                    ]
+
+                if zip_error:
+                    print(f"[ERROR] No se pudo leer ZIP de Nueva EPS {final_path}: {zip_error}")
+                    count, invalid_count = 0, 1
+                    missing_required = self.NUEVA_EPS_REQUERIDOS
+                else:
+                    count, invalid_count, missing_required, required_count = (
+                        self._validate_nueva_eps_pdfs(pdf_names, fid)
+                    )
+
+                if invalid_count:
+                    msg = f"MAL SOPORTADO ({invalid_count} PDF)"
+                    fill = self.fills['NARANJA']
+                elif missing_required or count < required_count:
+                    missing_label = ", ".join(sorted(missing_required))
+                    detail = f"; faltan {missing_label}" if missing_label else ""
+                    msg = f"FALTAN SOPORTES ({count}/{required_count}{detail})"
+                    fill = self.fills['AMARILLO']
+                else:
+                    msg = "SIN RADICAR"
+                    fill = self.fills['VERDE']
             elif final_path:
                 count = 0
                 invalid_count = 0
