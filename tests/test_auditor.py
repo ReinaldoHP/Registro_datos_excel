@@ -1,7 +1,7 @@
 from unittest.mock import patch
 import tkinter as tk
 from auditor_facturas import InvoiceAuditor
-import preparar_pruebas
+from tests import preparar_pruebas
 from pathlib import Path
 import pandas as pd
 

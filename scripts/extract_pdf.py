@@ -10,6 +10,7 @@ Año: 2026
 ==============================================================================
 """
 import os
+from pathlib import Path
 
 try:
     import PyPDF2
@@ -18,7 +19,10 @@ except ImportError:
     os.system("pip install PyPDF2")
     import PyPDF2
 
-pdf_path = 'MANUAL DE CONFORMACIÓN Y AGRUPAMIENTO DE LOS SOPORTES DE RADICACIÓN.pdf'
+project_root = Path(__file__).resolve().parent.parent
+references_dir = project_root / "docs" / "referencias"
+pdf_path = references_dir / "MANUAL DE CONFORMACIÓN Y AGRUPAMIENTO DE LOS SOPORTES DE RADICACIÓN.pdf"
+text_path = references_dir / "manual_texto.txt"
 
 try:
     with open(pdf_path, 'rb') as file:
@@ -29,8 +33,8 @@ try:
             if extracted:
                 text += extracted + "\n"
     
-    with open('manual_texto.txt', 'w', encoding='utf-8') as out_file:
+    with open(text_path, 'w', encoding='utf-8') as out_file:
         out_file.write(text)
-    print("Texto extraído exitosamente en 'manual_texto.txt'.")
+    print(f"Texto extraído exitosamente en '{text_path}'.")
 except Exception as e:
     print(f"Error al extraer texto: {e}")

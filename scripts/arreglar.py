@@ -1,10 +1,10 @@
 import os
 import shutil
+from pathlib import Path
 
-# Crear la carpeta si no existe
-dest_dir = "Tesseract-OCR"
-if not os.path.exists(dest_dir):
-    os.makedirs(dest_dir)
+project_root = Path(__file__).resolve().parent.parent
+dest_dir = project_root / "Tesseract-OCR"
+dest_dir.mkdir(exist_ok=True)
 
 # Archivos y carpetas de Tesseract a mover
 items_to_move = [
@@ -17,14 +17,15 @@ items_to_move = [
 ]
 
 # Mover también todos los archivos .dll y .html
-for file in os.listdir('.'):
+for file in os.listdir(project_root):
     if file.endswith('.dll') or file.endswith('.html'):
         if file not in items_to_move:
             items_to_move.append(file)
 
 for item in items_to_move:
-    if os.path.exists(item):
-        shutil.move(item, os.path.join(dest_dir, item))
+    source = project_root / item
+    if source.exists():
+        shutil.move(str(source), str(dest_dir / item))
         print(f"Movido: {item}")
 
 print("\n¡Listo! Todos los archivos de Tesseract han sido organizados.")

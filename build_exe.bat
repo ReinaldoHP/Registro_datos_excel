@@ -7,11 +7,12 @@
 :: "version": "1.0"
 :: "desarrollador": "Reinaldo Hurtado"
 :: ==============================================================================
+cd /d "%~dp0"
 echo Instalando requerimientos de interfaz...
 C:\Users\reina\AppData\Local\Python\bin\python.exe -m pip install customtkinter PyPDF2
 echo.
 echo Actualizando el número de versión (parche)...
-C:\Users\reina\AppData\Local\Python\bin\python.exe incrementar_version.py
+C:\Users\reina\AppData\Local\Python\bin\python.exe scripts\incrementar_version.py
 echo.
 echo Cerrando el ejecutable anterior si está en ejecución...
 taskkill /F /IM auditor_facturas.exe >nul 2>&1
