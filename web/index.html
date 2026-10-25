@@ -1,89 +1,129 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Auditor de Facturas</title>
-    <link rel="stylesheet" href="style.css" />
-    <!-- CDNs -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1220">
+  <title>Auditor de Facturas</title>
+  <link rel="stylesheet" href="style.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script defer src="app.js"></script>
 </head>
 <body>
-    <!-- Login Screen -->
-    <section id="home" class="centered glass">
-    <h2>Auditor de Facturas</h2>
-    <button id="open-login" class="btn-primary">Acceder</button>
-</section>
+  <main class="app-shell">
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">CONTROL DE ÓRDENES DE SERVICIO</p>
+        <h1>Auditor de Facturas</h1>
+        <p class="subtitle">Audita soportes o consolida listados Excel desde tu navegador.</p>
+      </div>
+      <span class="local-badge">Procesamiento local</span>
+    </header>
 
-<!-- Login Modal -->
-<div id="login-modal" class="modal hidden">
-  <div class="content glass">
-    <h2>Acceso al Auditor</h2>
-    <form id="login-form">
-      <input type="text" id="username" placeholder="Usuario" required />
-      <input type="password" id="password" placeholder="Contraseña" required />
-      <button type="submit">Ingresar</button>
-    </form>
-    <p>¿No tienes cuenta? <a href="#" id="show-register">Regístrate</a></p>
-    <p id="login-message" class="error"></p>
-    <button id="close-login" class="btn-secondary">Cancelar</button>
-  </div>
-</div>
+    <section class="card controls" aria-labelledby="audit-heading">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">AUDITORÍA</p>
+          <h2 id="audit-heading">Revisar soportes</h2>
+        </div>
+      </div>
+      <div class="form-grid">
+        <label class="field">
+          <span>Empresa / regla</span>
+          <select id="company-select">
+            <option>General</option>
+            <option>ADRES</option>
+            <option>COOSALUD / SANIDAD MILITAR</option>
+            <option>COLSANITAS (PREPAGADA)</option>
+            <option>GRUPO SOLIDARIA (Solidaria, Axa ARL, Bolivar SOAT, Zurich)</option>
+            <option>SEGUROS BOLIVAR ARL</option>
+            <option>GRUPO ESTADO (Estado, HDI, Mapfre, Sura SOAT, Colmena)</option>
+            <option>AXA COLPATRIA SEGUROS ESCOLARES</option>
+            <option>MUNDIAL DE SEGUROS</option>
+            <option>AXA COLPATRIA SOAT / EQUIDAD SEGUROS</option>
+            <option>LA PREVISORA</option>
+            <option>POSITIVA ARL Y SEGUROS ESCOLARES</option>
+            <option>SURA EPS / SURA ARL</option>
+            <option>NUEVA EPS</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Listado Excel (.xlsx)</span>
+          <input id="excel-file" type="file" accept=".xlsx">
+        </label>
+        <label class="field field-wide">
+          <span>Carpeta de soportes</span>
+          <input id="support-folder" type="file" webkitdirectory directory multiple>
+          <small>Selecciona la carpeta raíz. Se leen los nombres y rutas de sus archivos.</small>
+        </label>
+      </div>
+      <div class="button-row">
+        <button id="audit-all" class="button button-primary" type="button">Iniciar auditoría</button>
+        <span id="audit-status" class="status-message" role="status"></span>
+      </div>
+      <p class="notice">Los archivos se procesan en este navegador. Esta versión web no renombra archivos ni extrae texto interno de los PDF; evalúa rutas, nombres, tipos y cantidad de soportes.</p>
+    </section>
 
-    <!-- Main Dashboard (hidden until login) -->
-    <section id="dashboard" class="hidden">
-        <header>
-            <h1>Panel de Auditoría</h1>
-            <button id="logout">Cerrar Sesión</button>
-        </header>
-        <div class="toolbar">
-            <input type="file" id="excel-file" accept=".xlsx,.xls" />
-            <input type="file" id="support-folder" webkitdirectory directory multiple />
-            <select id="company-select">
-                <option value="COLSANITAS">Colsanitas</option>
-                <option value="ADRES">ADRES</option>
-                <option value="POLICIA">Policía</option>
-            </select>
-            <button id="audit-all">Actualizar Todo</button>
-            <button id="download-excel">Descargar Excel</button>
+    <section class="card merge-card" aria-labelledby="merge-heading">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">CONSOLIDACIÓN</p>
+          <h2 id="merge-heading">Agregar facturas de otro Excel</h2>
         </div>
-        <div class="grid-container">
-            <table id="data-grid">
-                <thead>
-                    <tr>
-                        <th>Factura</th>
-                        <th>Total</th>
-                        <th>Resultado</th>
-                        <th>Acciones</th>
-                    </tr>
-                    <tr class="filter-row">
-                        <th><input type="text" class="col-filter" data-col="0" placeholder="Filtrar" /></th>
-                        <th><input type="text" class="col-filter" data-col="1" placeholder="Filtrar" /></th>
-                        <th><input type="text" class="col-filter" data-col="2" placeholder="Filtrar" /></th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Rows will be injected by app.js -->
-                </tbody>
-            </table>
+      </div>
+      <div class="form-grid merge-grid">
+        <label class="field">
+          <span>Excel base (conservar)</span>
+          <input id="base-excel-file" type="file" accept=".xlsx">
+        </label>
+        <label class="field">
+          <span>Excel nuevo</span>
+          <input id="new-excel-file" type="file" accept=".xlsx">
+        </label>
+      </div>
+      <div class="button-row">
+        <button id="merge-excel" class="button button-secondary" type="button">Unir Excel</button>
+        <span class="helper-text">Usa SFANUMFAC como clave: conserva las filas existentes y agrega solo facturas nuevas.</span>
+      </div>
+    </section>
+
+    <section id="results-section" class="card results-card" hidden>
+      <div class="results-heading">
+        <div>
+          <p class="eyebrow">RESULTADOS</p>
+          <h2 id="results-title">Listado cargado</h2>
         </div>
+        <button id="download-excel" class="button button-secondary" type="button">Descargar Excel</button>
+      </div>
+      <div id="summary" class="summary-grid" aria-live="polite"></div>
+      <div class="color-legend" aria-label="Leyenda de colores reglamentarios">
+        <span><i class="swatch swatch-green"></i>Sin radicar</span>
+        <span><i class="swatch swatch-yellow"></i>Faltan soportes</span>
+        <span><i class="swatch swatch-red"></i>No carpeta</span>
+        <span><i class="swatch swatch-blue"></i>Pendiente</span>
+        <span><i class="swatch swatch-orange"></i>Mal soportado</span>
+        <span><i class="swatch swatch-purple"></i>Duplicado</span>
+        <span><i class="swatch swatch-brown"></i>Ubicación equivocada</span>
+        <span><i class="swatch swatch-pink"></i>Sobre costo</span>
+      </div>
+      <div class="table-tools">
+        <label class="search-field">
+          <span class="visually-hidden">Filtrar resultados</span>
+          <input id="table-search" type="search" placeholder="Buscar en los datos…">
+        </label>
+        <button id="clear-filters" class="button button-quiet" type="button">Limpiar filtros</button>
+        <span id="row-count" class="helper-text"></span>
+      </div>
+      <div class="table-scroll">
+        <table id="data-grid">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </section>
-    <!-- Registro de nuevo usuario -->
-    <section id="register-section" class="centered glass hidden">
-        <h2>Registro</h2>
-        <form id="register-form">
-            <input type="text" id="register-username" placeholder="Usuario" required />
-            <input type="password" id="register-password" placeholder="Contraseña" required />
-            <input type="password" id="register-confirm" placeholder="Confirmar Contraseña" required />
-            <button type="submit">Crear cuenta</button>
-            <p>¿Ya tienes cuenta? <a href="#" id="show-login">Inicia sesión</a></p>
-            <p id="register-message" class="error"></p>
-        </form>
-    </section>
-    <div class="toast-container"></div>
-    <script src="app.js"></script>
+    <div id="column-filter-menu" class="column-filter-menu" hidden></div>
+    <div class="toast-container" aria-live="polite"></div>
+  </main>
 </body>
 </html>

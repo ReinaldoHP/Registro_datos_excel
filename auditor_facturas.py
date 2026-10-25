@@ -5,7 +5,7 @@ Proyecto: Auditor de Facturas Excel
 Año: 2026
 ------------------------------------------------------------------------------
 "sistema": "Control de Órdenes de Servicio"
-"version": "2.0.11"
+"version": "2.0.12"
 "desarrollador": "Reinaldo Hurtado"
 ==============================================================================
 """
@@ -18,6 +18,7 @@ import customtkinter as ctk
 from pathlib import Path
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Font
+import pandas as pd
 import subprocess
 import zipfile
 import io
@@ -83,7 +84,7 @@ class InvoiceAuditor(ctk.CTk):
 
     def __init__(self):
         super().__init__()
-        self.title("Auditor Factura - Configuración de Reglas (v2.0.11)")
+        self.title("Auditor Factura - Configuración de Reglas (v2.0.12)")
         self.geometry("1000x550")
         self.configure(fg_color="#0F172A") # Fondo principal super oscuro #0F172A (aprox a #111827)
         
@@ -159,7 +160,7 @@ class InvoiceAuditor(ctk.CTk):
         firma_texto = (
             "Autor: Reinaldo Hurtado\n"
             "Sistema: Control de Órdenes de Servicio\n"
-            "Versión: 2.0.11\n"
+            "Versión: 2.0.12\n"
             "Desarrollador: Reinaldo Hurtado\n"
             "Año: 2026"
         )
@@ -171,7 +172,7 @@ class InvoiceAuditor(ctk.CTk):
         self.main_content.grid(row=0, column=1, sticky="nswe", padx=40, pady=30)
         
         # Título Arriba
-        lbl_header = ctk.CTkLabel(self.main_content, text="Auditor Factura - Configuración de Reglas (v2.0.11)", 
+        lbl_header = ctk.CTkLabel(self.main_content, text="Auditor Factura - Configuración de Reglas (v2.0.12)",
                                   font=ctk.CTkFont(size=14, weight="normal"), text_color="#94A3B8")
         lbl_header.pack(anchor="w", pady=(0, 20))
 
@@ -218,6 +219,19 @@ class InvoiceAuditor(ctk.CTk):
                                      fg_color="#059669", hover_color="#047857", text_color="white",
                                      height=45, corner_radius=8, command=self.audit_process)
         self.btn_run.pack(pady=(20, 0))
+
+        self.btn_merge = ctk.CTkButton(
+            self.main_content,
+            text="UNIR EXCEL NUEVO + EXISTENTE",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color="#2563EB",
+            hover_color="#1D4ED8",
+            text_color="white",
+            height=38,
+            corner_radius=8,
+            command=self.merge_excel_files,
+        )
+        self.btn_merge.pack(pady=(12, 0))
 
     def load_config(self):
         if self.config_file.exists():
@@ -292,6 +306,48 @@ class InvoiceAuditor(ctk.CTk):
                 messagebox.showerror("Error", "La ruta de guardado configurada no existe.")
         else:
             messagebox.showinfo("Ruta Vacía", "Selecciona primero una ruta de guardado.")
+
+    def merge_excel_files(self):
+        """Une dos Excel sin perder datos antiguos y agrega los nuevos."""
+        base_path = filedialog.askopenfilename(
+            title="Selecciona el Excel anterior o base",
+            filetypes=[("Archivos Excel", "*.xlsx")],
+        )
+        if not base_path:
+            return
+
+        new_path = filedialog.askopenfilename(
+            title="Selecciona el Excel nuevo",
+            filetypes=[("Archivos Excel", "*.xlsx")],
+        )
+        if not new_path:
+            return
+
+        save_path = filedialog.asksaveasfilename(
+            title="Guardar Excel combinado",
+            defaultextension=".xlsx",
+            filetypes=[("Archivos Excel", "*.xlsx")],
+            initialfile="excel_combinado.xlsx",
+            initialdir=os.path.dirname(base_path),
+        )
+        if not save_path:
+            return
+
+        try:
+            final_path = self.actualizar_excel_con_nuevos(
+                excel_antiguo=base_path,
+                excel_nuevo=new_path,
+                clave="SFANUMFAC",
+                destino=save_path,
+            )
+            self.save_path_var.set(str(final_path))
+            self.save_config()
+            messagebox.showinfo(
+                "Archivo combinado",
+                f"Se generó el Excel consolidado correctamente en:\n{final_path}",
+            )
+        except Exception as exc:
+            messagebox.showerror("Error al combinar Excel", str(exc))
 
     def _extract_id(self, text):
         if text is None or str(text).strip() == "" or str(text).strip().lower() == 'nan': 
@@ -432,6 +488,56 @@ class InvoiceAuditor(ctk.CTk):
                 if fid in ["2127662", "2127695", "2127758"]:
                     print(f"[DEBUG] Carpeta encontrada para {fid}: {index[fid]}")
         return index
+
+    @staticmethod
+    def actualizar_excel_con_nuevos(excel_antiguo, excel_nuevo, clave='SFANUMFAC', destino=None):
+        """Combina un Excel viejo y uno nuevo sin perder registros anteriores.
+
+        Conserva las filas antiguas y agrega solo las filas cuya clave no exista
+        todavía. Si una clave aparece repetida en el archivo nuevo, agrega solo
+        su primera aparición.
+        """
+        base_path = Path(excel_antiguo)
+        nuevo_path = Path(excel_nuevo)
+
+        if not base_path.exists():
+            raise FileNotFoundError(f"No existe el archivo base: {base_path}")
+        if not nuevo_path.exists():
+            raise FileNotFoundError(f"No existe el archivo nuevo: {nuevo_path}")
+
+        df_base = pd.read_excel(base_path)
+        df_nuevo = pd.read_excel(nuevo_path)
+
+        if df_base.empty and df_nuevo.empty:
+            resultado = pd.DataFrame()
+        else:
+            if clave not in df_base.columns:
+                raise ValueError(f"La columna '{clave}' no existe en el Excel base.")
+            if clave not in df_nuevo.columns:
+                raise ValueError(f"La columna '{clave}' no existe en el Excel nuevo.")
+
+            df_base[clave] = df_base[clave].map(lambda value: "" if pd.isna(value) else str(value).strip())
+            df_nuevo[clave] = df_nuevo[clave].map(lambda value: "" if pd.isna(value) else str(value).strip())
+
+            claves_existentes = set(df_base.loc[df_base[clave] != "", clave])
+            filas_nuevas = []
+            for _, fila in df_nuevo.iterrows():
+                valor_clave = fila[clave]
+                if valor_clave and valor_clave in claves_existentes:
+                    continue
+                filas_nuevas.append(fila)
+                if valor_clave:
+                    claves_existentes.add(valor_clave)
+
+            resultado = pd.concat(
+                [df_base, pd.DataFrame(filas_nuevas, columns=df_nuevo.columns)],
+                ignore_index=True,
+                sort=False,
+            )
+
+        destino_path = Path(destino) if destino else base_path
+        resultado.to_excel(destino_path, index=False)
+        return destino_path
 
     def audit_process(self):
         xl_file = self.xl_file_var.get()
