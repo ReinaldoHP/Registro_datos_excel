@@ -16,19 +16,21 @@ class NuevaEpsValidationTests(unittest.TestCase):
                 f"PDE_{self.nit}_{self.invoice_id}.pdf",
                 f"HEV_{self.nit}_{self.invoice_id}.pdf",
                 f"LDP_{self.nit}_{self.invoice_id}.pdf",
+                f"CRC_{self.nit}_{self.invoice_id}.pdf",
             ],
             self.invoice_id,
         )
 
         self.assertEqual(result, (4, 0, set(), 4))
 
-    def test_ldp_is_required_but_does_not_count_toward_four(self):
+    def test_ldp_and_crc_are_required_but_do_not_count_toward_four(self):
         result = InvoiceAuditor._validate_nueva_eps_pdfs(
             [
                 f"FEV_{self.nit}_{self.invoice_id}.pdf",
                 f"OPF_{self.nit}_{self.invoice_id}.pdf",
                 f"PDE_{self.nit}_{self.invoice_id}.pdf",
                 f"LDP_{self.nit}_{self.invoice_id}.pdf",
+                f"CRC_{self.nit}_{self.invoice_id}.pdf",
             ],
             self.invoice_id,
         )
@@ -44,11 +46,26 @@ class NuevaEpsValidationTests(unittest.TestCase):
                 f"PDX_{self.nit}_{self.invoice_id}.pdf",
                 f"RAN_{self.nit}_{self.invoice_id}.pdf",
                 f"LDP_{self.nit}_{self.invoice_id}.pdf",
+                f"CRC_{self.nit}_{self.invoice_id}.pdf",
             ],
             self.invoice_id,
         )
 
         self.assertEqual(result, (5, 0, {"OPF"}, 4))
+
+    def test_crc_is_required_but_does_not_count_toward_four(self):
+        result = InvoiceAuditor._validate_nueva_eps_pdfs(
+            [
+                f"FEV_{self.nit}_{self.invoice_id}.pdf",
+                f"OPF_{self.nit}_{self.invoice_id}.pdf",
+                f"PDE_{self.nit}_{self.invoice_id}.pdf",
+                f"HEV_{self.nit}_{self.invoice_id}.pdf",
+                f"LDP_{self.nit}_{self.invoice_id}.pdf",
+            ],
+            self.invoice_id,
+        )
+
+        self.assertEqual(result, (4, 0, {"CRC"}, 4))
 
     def test_unlisted_support_type_is_invalid(self):
         result = InvoiceAuditor._validate_nueva_eps_pdfs(
@@ -59,7 +76,7 @@ class NuevaEpsValidationTests(unittest.TestCase):
             self.invoice_id,
         )
 
-        self.assertEqual(result, (1, 1, {"OPF", "PDE", "LDP"}, 4))
+        self.assertEqual(result, (1, 1, {"OPF", "PDE", "LDP", "CRC"}, 4))
 
     def test_wrong_invoice_number_is_invalid(self):
         result = InvoiceAuditor._validate_nueva_eps_pdfs(
@@ -69,6 +86,7 @@ class NuevaEpsValidationTests(unittest.TestCase):
                 f"PDE_{self.nit}_{self.invoice_id}.pdf",
                 f"HEV_{self.nit}_{self.invoice_id}.pdf",
                 f"LDP_{self.nit}_{self.invoice_id}.pdf",
+                f"CRC_{self.nit}_{self.invoice_id}.pdf",
             ],
             self.invoice_id,
         )
@@ -84,6 +102,7 @@ class NuevaEpsValidationTests(unittest.TestCase):
                 f"OPF_{self.nit}_{self.invoice_id}.pdf",
                 f"PDE_{self.nit}_{self.invoice_id}.pdf",
                 f"LDP_{self.nit}_{self.invoice_id}.pdf",
+                f"CRC_{self.nit}_{self.invoice_id}.pdf",
             ],
             self.invoice_id,
         )
@@ -110,18 +129,6 @@ class NuevaEpsValidationTests(unittest.TestCase):
 
         self.assertFalse(InvoiceAuditor._is_wrong_invoice_location(correct_path))
         self.assertTrue(InvoiceAuditor._is_wrong_invoice_location(misplaced_path))
-
-    def test_duplicate_exact_invoice_folders_are_detected_as_ambiguous(self):
-        first_copy = Path("C:/Soportes/CONSULTA EXTERNA/2177633")
-        second_copy = Path("D:/Hospital/Nueva carpeta/6-JUN/2177633")
-        unrelated_prefix = Path("C:/Soportes/CONSULTA EXTERNA/2177633 PTE")
-
-        exact_matches = InvoiceAuditor._get_exact_invoice_folders(
-            [first_copy, second_copy, unrelated_prefix],
-            "2177633",
-        )
-
-        self.assertEqual(exact_matches, [first_copy, second_copy])
 
 
 if __name__ == "__main__":

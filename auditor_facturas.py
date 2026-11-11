@@ -11,6 +11,7 @@ Año: 2026
 """
 import os
 import re
+import sys
 import json
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -27,6 +28,13 @@ try:
 except ImportError:
     PyPDF2 = None
 
+def _app_dir():
+    """Carpeta persistente de la app (junto al .exe si está compilado)."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
+
+
 # Evitar ventana de cmd
 CREATE_NO_WINDOW = 0x08000000
 
@@ -34,53 +42,16 @@ CREATE_NO_WINDOW = 0x08000000
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
 
-class DuplicateSelector(ctk.CTkToplevel):
-    """Interfaz gráfica para resolver colisiones de facturas duplicadas en el sistema."""
-    def __init__(self, parent, factura_id, options):
-        super().__init__(parent)
-        self.title(f"Duplicados - Fac {factura_id}")
-        self.geometry("750x400")
-        self.result = None
-        
-        # Etiqueta informativa
-        ctk.CTkLabel(
-            self, 
-            text=f"Se han detectado {len(options)} posibles ubicaciones.\nSelecciona la carpeta correcta para la auditoría de {factura_id}:",
-            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
-        ).pack(pady=15)
-
-        # Marco con lista tipo Scrollable
-        frame = ctk.CTkScrollableFrame(self, fg_color="#1E293B", corner_radius=10)
-        frame.pack(fill=tk.BOTH, expand=True, padx=25, pady=5)
-        
-        for opt in options:
-            btn = ctk.CTkButton(
-                frame, 
-                text=str(opt),
-                font=("Consolas", 12),
-                fg_color="#334155",
-                hover_color="#475569",
-                anchor="w",
-                command=lambda o=opt: self.on_select(Path(o))
-            )
-            btn.pack(fill="x", padx=5, pady=3)
-        
-        self.transient(parent)
-        self.grab_set()
-        parent.wait_window(self)
-
-    def on_select(self, path):
-        self.result = path
-        self.destroy()
-
-
 class InvoiceAuditor(ctk.CTk):
     NUEVA_EPS_TIPOS_PERMITIDOS = {
         "FEV", "HEV", "EPI", "PDX", "DQX", "RAN",
-        "TAP", "FMO", "OPF", "LDP", "HAU", "HAM", "PDE",
+        "TAP", "FMO", "OPF", "LDP", "HAU", "HAM", "PDE", "CRC",
     }
-    NUEVA_EPS_REQUERIDOS = {"FEV", "OPF", "PDE", "LDP"}
-    NUEVA_EPS_NO_CUENTA = {"LDP"}
+    # Circular N°001 de 2026 (Res. 2284/2023): CRC se exige igual que LDP.
+    NUEVA_EPS_REQUERIDOS = {"FEV", "OPF", "PDE", "LDP", "CRC"}
+    NUEVA_EPS_NO_CUENTA = {"LDP", "CRC"}
+    # Prefijos que no suman al conteo de soportes en las demás reglas.
+    SOPORTES_NO_CONTADOS = ("LDP_", "CRC_")
 
     def __init__(self):
         super().__init__()
@@ -124,7 +95,7 @@ class InvoiceAuditor(ctk.CTk):
             "NUEVA EPS"
         ]
 
-        self.config_file = Path(__file__).parent / "auditor_config.json"
+        self.config_file = _app_dir() / "auditor_config.json"
         
         # Primero construir, luego cargar archivo (evita variables fantasma)
         self.build_ui()
@@ -243,7 +214,8 @@ class InvoiceAuditor(ctk.CTk):
                     self.search_root_var.set(config.get('search_root', ''))
                     self.save_path_var.set(config.get('save_path', ''))
                     self.empresa_var.set(config.get('empresa', 'General'))
-            except: pass
+            except (OSError, json.JSONDecodeError) as exc:
+                print(f"[ERROR] No se pudo leer la configuración {self.config_file}: {exc}")
 
     def save_config(self):
         try:
@@ -255,7 +227,8 @@ class InvoiceAuditor(ctk.CTk):
             }
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(config, f, indent=4)
-        except: pass
+        except OSError as exc:
+            print(f"[ERROR] No se pudo guardar la configuración {self.config_file}: {exc}")
 
     def sel_excel(self):
         current = self.xl_file_var.get()
@@ -360,6 +333,15 @@ class InvoiceAuditor(ctk.CTk):
         return val
 
     @staticmethod
+    def _number_tokens(text):
+        """Números completos presentes en un nombre, sin ceros a la izquierda."""
+        return {tok.lstrip('0') or '0' for tok in re.findall(r'\d+', str(text))}
+
+    @classmethod
+    def _name_has_invoice(cls, text, invoice_id):
+        return (str(invoice_id).lstrip('0') or '0') in cls._number_tokens(text)
+
+    @staticmethod
     def _is_wrong_invoice_location(invoice_path):
         path_parts = [part.upper() for part in invoice_path.parts]
         has_letters_in_name = any(char.isalpha() for char in invoice_path.stem)
@@ -397,13 +379,6 @@ class InvoiceAuditor(ctk.CTk):
         description = invoice_path.stem.upper().replace(invoice_id, "")
         description = description.replace("_", " ").replace("-", " ").strip()
         return description or "PENDIENTE"
-
-    @staticmethod
-    def _get_exact_invoice_folders(matches, invoice_id):
-        return [
-            path for path in matches
-            if path.stem.upper().strip() == invoice_id
-        ]
 
     @classmethod
     def _validate_nueva_eps_pdfs(cls, pdf_names, invoice_id):
@@ -449,7 +424,7 @@ class InvoiceAuditor(ctk.CTk):
             return None
         try:
             reader = PyPDF2.PdfReader(io.BytesIO(pdf_bytes))
-            for page in reader.pages:
+            for page in reader.pages[:2]:
                 text = page.extract_text() or ""
                 # Normalizar: quitar saltos de línea innecesarios y espacios extra
                 text_clean = re.sub(r'[\r\n]+', ' ', text)
@@ -462,6 +437,33 @@ class InvoiceAuditor(ctk.CTk):
         except Exception:
             pass
         return None
+
+    def _fev_invoice_mismatch(self, location, invoice_id):
+        """Lee el número impreso en el FEV de la carpeta/ZIP.
+
+        Retorna ese número si NO corresponde con la factura buscada; None si
+        coincide o si no hay FEV legible (en ese caso no se puede verificar).
+        """
+        if location.suffix.lower() == '.zip':
+            fev_bytes = self._get_fev_bytes_from_zip(location)
+        elif location.is_dir():
+            fev_bytes = self._get_fev_bytes_from_folder(location)
+        else:
+            return None
+        numero_pdf = self._extract_fid_from_fev_pdf(fev_bytes) if fev_bytes else None
+        if numero_pdf and numero_pdf != (str(invoice_id).lstrip('0') or '0'):
+            return numero_pdf
+        return None
+
+    @staticmethod
+    def _duplicate_message(matches, search_root):
+        rutas = []
+        for path in matches:
+            try:
+                rutas.append(str(Path(path).relative_to(search_root)))
+            except ValueError:
+                rutas.append(str(path))
+        return f"DUPLICADO ({len(matches)}): " + " | ".join(rutas)
 
     def _get_fev_bytes_from_folder(self, folder_path):
         """Retorna los bytes del primer FEV PDF encontrado en una carpeta."""
@@ -490,20 +492,19 @@ class InvoiceAuditor(ctk.CTk):
         if not ids_list: return {}
         print(f"[INFO] Generando mapeo directo para {len(ids_list)} facturas del Excel...")
         
+        # Se compara contra los números completos del nombre, así "212789"
+        # no coincide con la carpeta "2127892".
         for root, dirs, files in os.walk(base_path):
             current_dir = Path(root)
             for d in dirs:
-                d_upper = d.upper().strip()
-                for fid in ids_list:
-                    if fid in d_upper:
+                for fid in self._number_tokens(d):
+                    if fid in index:
                         index[fid].append(current_dir / d)
-                        
+
             for f in files:
                 if f.lower().endswith('.zip'):
-                    f_upper = f.upper().strip()
-                    f_clean = Path(f).stem.upper().strip()
-                    for fid in ids_list:
-                        if fid in f_clean or fid in f_upper:
+                    for fid in self._number_tokens(Path(f).stem):
+                        if fid in index:
                             index[fid].append(current_dir / f)
 
         found_count = 0
@@ -511,8 +512,7 @@ class InvoiceAuditor(ctk.CTk):
             index[fid] = list(set(index[fid]))
             if index[fid]:
                 found_count += 1
-                if fid in ["2127662", "2127695", "2127758"]:
-                    print(f"[DEBUG] Carpeta encontrada para {fid}: {index[fid]}")
+        print(f"[INFO] Facturas con ubicación encontrada: {found_count}/{len(ids_list)}")
         return index
 
     @staticmethod
@@ -566,6 +566,14 @@ class InvoiceAuditor(ctk.CTk):
         return destino_path
 
     def audit_process(self):
+        try:
+            self._run_audit()
+        except Exception as exc:
+            messagebox.showerror("Error en la auditoría", f"La auditoría se detuvo por un error:\n{exc}")
+        finally:
+            self.btn_run.configure(text="INICIAR PROCESO DE AUDITORÍA", state="normal")
+
+    def _run_audit(self):
         xl_file = self.xl_file_var.get()
         search_root = self.search_root_var.get()
         save_path = self.save_path_var.get()
@@ -643,8 +651,8 @@ class InvoiceAuditor(ctk.CTk):
                                             col_zip_facturas_pdfs.append((current_dir / f, member))
                                         elif any(p in member_parts for p in ["SOPORTES", "SOPORTE"]):
                                             col_zip_soportes_pdfs.append((current_dir / f, member))
-                        except:
-                            pass
+                        except (OSError, zipfile.BadZipFile) as exc:
+                            print(f"[ERROR] No se pudo leer ZIP {current_dir / f}: {exc}")
         else:
             dir_map = self.build_native_index(search_root, excel_ids)
 
@@ -663,36 +671,10 @@ class InvoiceAuditor(ctk.CTk):
             fid = self._extract_id(val)
             if not fid: continue
             
-            matches = dir_map.get(fid, [])
-            
-            final_path = None
-            if matches:
-                pendientes = [p for p in matches if ("PENDIENTE" in p.stem.upper() or any(c.isalpha() for c in p.stem))]
-                exact_folders = self._get_exact_invoice_folders(matches, fid)
-                prefix_folders = [p for p in matches if (p.stem.upper().strip().startswith(f"{fid}_") or p.stem.upper().strip().startswith(f"{fid} "))]
-                
-                # Sort to prefer directories over files (zips) if both exist
-                pendientes.sort(key=lambda x: not x.is_dir())
-                exact_folders.sort(key=lambda x: not x.is_dir())
-                prefix_folders.sort(key=lambda x: not x.is_dir())
+            # Regla: si el número aparece en más de una carpeta/ZIP es DUPLICADO.
+            matches = sorted(set(dir_map.get(fid, [])), key=str)
+            final_path = matches[0] if len(matches) == 1 else None
 
-                if pendientes:
-                    final_path = pendientes[0]
-                elif len(exact_folders) == 1:
-                    final_path = exact_folders[0]
-                elif len(exact_folders) > 1:
-                    sel_dialog = DuplicateSelector(self, fid, exact_folders)
-                    final_path = sel_dialog.result
-                elif len(prefix_folders) == 1:
-                    final_path = prefix_folders[0]
-                elif len([p for p in matches if p.is_dir()]) == 1:
-                    final_path = [p for p in matches if p.is_dir()][0]
-                elif len(matches) > 1:
-                    sel_dialog = DuplicateSelector(self, fid, matches)
-                    final_path = sel_dialog.result
-                elif len(matches) == 1:
-                    final_path = matches[0]
-                        
             fill = self.fills['ROJO']
             msg = "NO CARPETA"
 
@@ -703,12 +685,19 @@ class InvoiceAuditor(ctk.CTk):
                 else:
                     es_ubicacion_equivocada = self._is_wrong_invoice_location(final_path)
 
-            if not final_path and matches and len(matches) > 1:
-                msg = "DUPLICADO"
+            numero_en_fev = None
+            if final_path and not es_ubicacion_equivocada:
+                numero_en_fev = self._fev_invoice_mismatch(final_path, fid)
+
+            if len(matches) > 1:
+                msg = self._duplicate_message(matches, search_root)
                 fill = self.fills['MORADO']
             elif es_ubicacion_equivocada:
                 msg = "UBICACIÓN EQUIVOCADA"
                 fill = self.fills['MARRON_CLARO']
+            elif numero_en_fev:
+                msg = f"FACTURA NO CORRESPONDE (PDF: {numero_en_fev})"
+                fill = self.fills['NARANJA']
             elif empresa == "SANITAS" and final_path:
                 try:
                     valid_zip = self._validate_sanitas_zip(final_path, fid)
@@ -726,13 +715,13 @@ class InvoiceAuditor(ctk.CTk):
                 clean_fid = fid.upper().strip().lstrip('0')
                 
                 # Check for matching invoice file in FACTURAS (stem must contain clean_fid)
-                has_fac_pdf = any(clean_fid in p.stem.upper() for p in col_facturas_pdfs)
-                has_fac_zip = any(clean_fid in Path(m).stem.upper() for z, m in col_zip_facturas_pdfs)
+                has_fac_pdf = any(self._name_has_invoice(p.stem, clean_fid) for p in col_facturas_pdfs)
+                has_fac_zip = any(self._name_has_invoice(Path(m).stem, clean_fid) for z, m in col_zip_facturas_pdfs)
                 has_fac = has_fac_pdf or has_fac_zip
                 
                 # Check for matching support file in SOPORTES (stem must contain clean_fid and 'SOP')
-                has_sop_pdf = any(clean_fid in p.stem.upper() and 'SOP' in p.stem.upper() for p in col_soportes_pdfs)
-                has_sop_zip = any(clean_fid in Path(m).stem.upper() and 'SOP' in Path(m).stem.upper() for z, m in col_zip_soportes_pdfs)
+                has_sop_pdf = any(self._name_has_invoice(p.stem, clean_fid) and 'SOP' in p.stem.upper() for p in col_soportes_pdfs)
+                has_sop_zip = any(self._name_has_invoice(Path(m).stem, clean_fid) and 'SOP' in Path(m).stem.upper() for z, m in col_zip_soportes_pdfs)
                 has_sop = has_sop_pdf or has_sop_zip
                 
                 if has_fac and has_sop:
@@ -804,19 +793,8 @@ class InvoiceAuditor(ctk.CTk):
                             nit_en_nombre = folder_match.group(1)
                             fid_en_nombre = folder_match.group(2)
 
-                            # --- PASO 1: Extraer número real de factura desde el FEV PDF ---
-                            if final_path.suffix.lower() == '.zip':
-                                fev_bytes = self._get_fev_bytes_from_zip(final_path)
-                            else:
-                                fev_bytes = self._get_fev_bytes_from_folder(final_path)
-
-                            fid_real = self._extract_fid_from_fev_pdf(fev_bytes) if fev_bytes else None
-
-                            # Si el PDF nos dice un número distinto al del nombre → usar el del PDF
-                            if fid_real and fid_real != fid_en_nombre:
-                                fid = fid_real  # Actualizar el fid para el resto de la auditoría
-
-                            # --- PASO 2: Corregir NIT si es incorrecto ---
+                            # Si el FEV no coincide ya se reportó "FACTURA NO
+                            # CORRESPONDE"; aquí solo se corrige el NIT del nombre.
                             nit_correcto = "800218979"
                             if nit_en_nombre != nit_correcto or fid_en_nombre != fid:
                                 new_stem = f"{nit_correcto}_{fid}"
@@ -826,8 +804,8 @@ class InvoiceAuditor(ctk.CTk):
                                     os.rename(final_path, new_path)
                                     final_path = new_path
                                     print(f"[RENOMBRADO] {folder_match.group(0)} → {new_stem}")
-                                except Exception:
-                                    pass
+                                except OSError as exc:
+                                    print(f"[ERROR] No se pudo renombrar {final_path} → {new_path}: {exc}")
 
                     if final_path.suffix.lower() == '.zip':
                         zip_modified = False
@@ -855,23 +833,25 @@ class InvoiceAuditor(ctk.CTk):
                                             item.filename = new_name
                                             zf_out.writestr(item, content)
                                     zip_modified = True
-                        except Exception:
-                            pass
-                            
+                        except (OSError, zipfile.BadZipFile) as exc:
+                            print(f"[ERROR] No se pudo corregir nombres dentro de {final_path}: {exc}")
+                            zip_modified = False
+
                         if zip_modified:
                             try:
-                                os.remove(final_path)
-                                os.rename(temp_zip_path, final_path)
-                            except Exception:
-                                pass
-                        elif temp_zip_path.exists():
+                                # os.replace sustituye de forma atómica: si falla,
+                                # el ZIP original queda intacto.
+                                os.replace(temp_zip_path, final_path)
+                            except OSError as exc:
+                                print(f"[ERROR] No se pudo reemplazar {final_path}: {exc}")
+                        if temp_zip_path.exists():
                             try:
                                 os.remove(temp_zip_path)
-                            except:
-                                pass
+                            except OSError as exc:
+                                print(f"[ERROR] No se pudo borrar temporal {temp_zip_path}: {exc}")
 
                         with zipfile.ZipFile(final_path, 'r') as zf:
-                            pdf_files_list = [f for f in zf.namelist() if f.lower().endswith('.pdf') and not Path(f).name.upper().startswith('LDP_')]
+                            pdf_files_list = [f for f in zf.namelist() if f.lower().endswith('.pdf') and not Path(f).name.upper().startswith(self.SOPORTES_NO_CONTADOS)]
                             xml_count = len([f for f in zf.namelist() if f.lower().endswith('.xml') or (Path(f).name.lower().startswith('ad') and not f.lower().endswith('.pdf'))])
                     else:
                         # Auto-corregir nombres de archivos PDF con espacios o guiones
@@ -883,10 +863,10 @@ class InvoiceAuditor(ctk.CTk):
                                 if new_name != f.name:
                                     try:
                                         os.rename(f, final_path / new_name)
-                                    except Exception:
-                                        pass
+                                    except OSError as exc:
+                                        print(f"[ERROR] No se pudo renombrar {f} → {new_name}: {exc}")
 
-                        pdf_files_list = [f.name for f in final_path.glob("*.pdf") if not f.name.upper().startswith('LDP_')]
+                        pdf_files_list = [f.name for f in final_path.glob("*.pdf") if not f.name.upper().startswith(self.SOPORTES_NO_CONTADOS)]
                         xml_count = len([f for f in final_path.iterdir() if f.is_file() and (f.suffix.lower() == '.xml' or (f.name.lower().startswith('ad') and f.suffix.lower() != '.pdf'))])
                     
                     count = len(pdf_files_list)
@@ -901,7 +881,8 @@ class InvoiceAuditor(ctk.CTk):
                                 name_stem = Path(fname).stem
                                 if "__" in name_stem or fid not in name_stem:
                                     invalid_count += 1
-                except: pass
+                except (OSError, zipfile.BadZipFile) as exc:
+                    print(f"[ERROR] No se pudieron revisar los soportes de {final_path}: {exc}")
 
                 stem_upper = final_path.stem.upper()
                 has_letters = any(c.isalpha() for c in stem_upper)
@@ -1024,9 +1005,10 @@ class InvoiceAuditor(ctk.CTk):
             if col_total_idx:
                 try:
                     val_tot = ws.cell(row=i, column=col_total_idx).value
-                    if val_tot is not None and float(val_tot) > 5000000:
+                    if (val_tot is not None and not isinstance(val_tot, bool)
+                            and float(val_tot) > 5000000):
                         is_sobre_costo = True
-                except ValueError:
+                except (TypeError, ValueError):
                     pass
 
             if is_sobre_costo:

@@ -35,9 +35,10 @@ const inlineHtml = html
   .replace(/  <link rel="stylesheet" href="style\.css">\r?\n/, `  <style>\n${css}\n  </style>\n`)
   .replace(/  <script defer src="https:\/\/cdn\.jsdelivr\.net\/npm\/exceljs@4\.4\.0\/dist\/exceljs\.min\.js"><\/script>\r?\n/, '')
   .replace(/  <script defer src="https:\/\/cdn\.jsdelivr\.net\/npm\/jszip@3\.10\.1\/dist\/jszip\.min\.js"><\/script>\r?\n/, '')
-  .replace(/  <script defer src="app\.js"><\/script>\r?\n/, `  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>\n  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>\n  <script>\n${bootstrappedJavascript}\n  </script>\n`);
+  .replace(/  <script defer src="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/pdf\.js\/3\.11\.174\/pdf\.min\.js"><\/script>\r?\n/, '')
+  .replace(/  <script defer src="app\.js"><\/script>\r?\n/, `  <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>\n  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>\n  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>\n  <script>\n${bootstrappedJavascript}\n  </script>\n`);
 
-if (inlineHtml === html || /(?:href|src)="(?:style\.css|app\.js)"/.test(inlineHtml)) {
+if (inlineHtml === html || /(?:href|src)="(?:style\.css|app\.js)"/.test(inlineHtml) || /<script defer /.test(inlineHtml)) {
   throw new Error('Could not replace all web assets while preparing the Apps Script HTML.');
 }
 

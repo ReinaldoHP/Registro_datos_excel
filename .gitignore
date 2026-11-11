@@ -5,3 +5,20 @@ venv/
 *.tmp
 *.log
 .clasp.json
+
+# Artefactos de compilación (PyInstaller)
+build/
+dist/
+
+# Herramientas externas incluidas localmente
+Tesseract-OCR/
+
+# Cachés y archivos del sistema
+.pytest_cache/
+Thumbs.db
+
+# Preferencias locales de la aplicación
+auditor_config.json
+
+# Salidas generadas por las pruebas
+tests/PRUEBAS_AUDITOR/*_out.xlsx

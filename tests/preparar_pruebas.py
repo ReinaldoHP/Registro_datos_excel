@@ -7,17 +7,19 @@ def crear_pdf_falso(ruta):
     with open(ruta, 'w') as f:
         f.write("%PDF-1.4 Mock Content")
 
-def preparar_entorno():
-    base_test = Path(__file__).parent / "PRUEBAS_AUDITOR"
+def preparar_entorno(base_dir=None):
+    """Crea la estructura de pruebas en base_dir (por defecto tests/PRUEBAS_AUDITOR)."""
+    base_test = Path(base_dir) if base_dir else Path(__file__).parent / "PRUEBAS_AUDITOR"
     base_test.mkdir(parents=True, exist_ok=True)
     
     config = {
         "100": {"tipo": "Normal", "pdfs": 4, "subfolder": ""},
         "200_AZUL": {"tipo": "Azul", "pdfs": 4, "subfolder": ""},
-        "300": {"tipo": "Policia", "pdfs": 4, "subfolder": "POLICIA"},
+        "300": {"tipo": "Policia", "pdfs": 4, "subfolder": "CONSULTA EXTERNA/POLICIA"},
         "400": {"tipo": "Incompleto", "pdfs": 2, "subfolder": ""},
         "500": {"tipo": "Duplicado1", "pdfs": 4, "subfolder": "ZONA_NORTE"},
-        "500_DUPLICADO": {"tipo": "Duplicado2", "pdfs": 4, "subfolder": "ZONA_SUR"}
+        "500_DUPLICADO": {"tipo": "Duplicado2", "pdfs": 4, "subfolder": "ZONA_SUR"},
+        "600 PTE LAB": {"tipo": "Pendiente", "pdfs": 2, "subfolder": "PENDIENTE"}
     }
     
     # Crear carpetas y PDFs
@@ -41,6 +43,7 @@ def preparar_entorno():
         "HSVE000300", 
         "HSVE000400", 
         "HSVE000500", 
+        "HSVE000600", # Pendiente con texto dentro de PENDIENTE
         "HSVE000999", # No existe
         "HSVE2127892", # Colsanitas Completo
         "HSVE2127893", # Colsanitas Faltan Soportes
@@ -48,7 +51,7 @@ def preparar_entorno():
         "HSVE212789"   # Colsanitas Coincidencia Parcial (Debe ser NO CARPETA)
     ]
     
-    df = pd.DataFrame({"SFANUMFAC": facturas, "TOTAL_FACTURADO": [100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000, 1000000]})
+    df = pd.DataFrame({"SFANUMFAC": facturas, "TOTAL_FACTURADO": [100000, 200000, 300000, 400000, 500000, 550000, 600000, 700000, 800000, 900000, 1000000]})
     excel_path = base_test / "excel_de_prueba.xlsx"
     df.to_excel(excel_path, index=False)
     
