@@ -23,6 +23,7 @@ import pandas as pd
 import subprocess
 import zipfile
 import io
+from datetime import date
 try:
     import PyPDF2
 except ImportError:
@@ -49,6 +50,19 @@ class InvoiceAuditor(ctk.CTk):
     }
     # Circular N°001 de 2026 (Res. 2284/2023): CRC se exige igual que LDP.
     NUEVA_EPS_REQUERIDOS = {"FEV", "OPF", "PDE", "LDP", "CRC"}
+    # Circular N°001 de 2026: el CRC se exige a facturas con fecha desde este día.
+    CRC_EXIGIDO_DESDE = date(2026, 11, 11)
+    # Manual de radicación / Res. 2284: debe ir al menos uno de estos soportes.
+    SOPORTE_CLINICO = {"HEV", "PDX"}
+    SOPORTE_CLINICO_LABEL = "HEV/PDX"
+    # Empresas que nombran cada soporte por tipo (Res. 2284) y por eso se
+    # puede verificar HEV/PDX por el nombre del archivo.
+    EMPRESAS_EXIGEN_HEV_O_PDX = {
+        "General",
+        "COOSALUD / SANIDAD MILITAR",
+        "SEGUROS BOLIVAR ARL",
+        "SURA EPS / SURA ARL",
+    }
     NUEVA_EPS_NO_CUENTA = {"LDP", "CRC"}
     # Prefijos que no suman al conteo de soportes en las demás reglas.
     SOPORTES_NO_CONTADOS = ("LDP_", "CRC_")
@@ -381,7 +395,7 @@ class InvoiceAuditor(ctk.CTk):
         return description or "PENDIENTE"
 
     @classmethod
-    def _validate_nueva_eps_pdfs(cls, pdf_names, invoice_id):
+    def _validate_nueva_eps_pdfs(cls, pdf_names, invoice_id, exigir_crc=True):
         invoice_id = str(invoice_id).lstrip('0') or '0'
         valid_supports = set()
         invalid_count = 0
@@ -407,7 +421,10 @@ class InvoiceAuditor(ctk.CTk):
             valid_supports.add(support_type)
 
         counted_supports = valid_supports - cls.NUEVA_EPS_NO_CUENTA
-        missing_required = cls.NUEVA_EPS_REQUERIDOS - valid_supports
+        requeridos = cls.NUEVA_EPS_REQUERIDOS if exigir_crc else cls.NUEVA_EPS_REQUERIDOS - {"CRC"}
+        missing_required = requeridos - valid_supports
+        if not valid_supports & cls.SOPORTE_CLINICO:
+            missing_required = missing_required | {cls.SOPORTE_CLINICO_LABEL}
         return (
             len(counted_supports),
             invalid_count,
@@ -415,45 +432,66 @@ class InvoiceAuditor(ctk.CTk):
             4,
         )
 
-    def _extract_fid_from_fev_pdf(self, pdf_bytes):
-        """Lee los bytes de un PDF FEV y extrae el número de factura.
-        Busca el patrón: 'FACTURA ELECTRONICA DE VENTA No.' seguido del número.
-        Retorna el número como string limpio, o None si no lo encuentra.
-        """
-        if PyPDF2 is None:
-            return None
+    @staticmethod
+    def _parse_fev_text(text):
+        """Extrae (número de factura, fecha) del texto de un FEV."""
+        text = re.sub(r'\s+', ' ', text or "")
+        numero = None
+        fecha = None
+        match = re.search(r'FACTURA\s+ELECTR[OÓ]NICA\s+DE\s+VENTA\s+No\.?\s*(\d+)',
+                          text, re.IGNORECASE)
+        if match:
+            numero = match.group(1).lstrip('0') or '0'
+        # Formato colombiano DÍA/MES/AÑO, p. ej. "Fecha: 1/06/2026 6:15:10 a. m."
+        match = re.search(r'Fecha:\s*(\d{1,2})/(\d{1,2})/(\d{4})', text, re.IGNORECASE)
+        if match:
+            try:
+                fecha = date(int(match.group(3)), int(match.group(2)), int(match.group(1)))
+            except ValueError:
+                fecha = None
+        return numero, fecha
+
+    def _extract_fev_data(self, pdf_bytes):
+        """Lee las 2 primeras páginas de un FEV y retorna (número, fecha)."""
+        if PyPDF2 is None or not pdf_bytes:
+            return None, None
         try:
             reader = PyPDF2.PdfReader(io.BytesIO(pdf_bytes))
-            for page in reader.pages[:2]:
-                text = page.extract_text() or ""
-                # Normalizar: quitar saltos de línea innecesarios y espacios extra
-                text_clean = re.sub(r'[\r\n]+', ' ', text)
-                match = re.search(
-                    r'FACTURA\s+ELECTR[OÓ]NICA\s+DE\s+VENTA\s+No\.?\s*(\d+)',
-                    text_clean, re.IGNORECASE
-                )
-                if match:
-                    return match.group(1).lstrip('0') or '0'
-        except Exception:
-            pass
-        return None
+            text = " ".join(page.extract_text() or "" for page in reader.pages[:2])
+        except Exception as exc:
+            print(f"[ERROR] No se pudo leer el FEV: {exc}")
+            return None, None
+        return self._parse_fev_text(text)
 
-    def _fev_invoice_mismatch(self, location, invoice_id):
-        """Lee el número impreso en el FEV de la carpeta/ZIP.
-
-        Retorna ese número si NO corresponde con la factura buscada; None si
-        coincide o si no hay FEV legible (en ese caso no se puede verificar).
-        """
+    def _read_fev(self, location):
+        """(número, fecha) del FEV de una carpeta o ZIP; (None, None) si no hay."""
         if location.suffix.lower() == '.zip':
             fev_bytes = self._get_fev_bytes_from_zip(location)
         elif location.is_dir():
             fev_bytes = self._get_fev_bytes_from_folder(location)
         else:
-            return None
-        numero_pdf = self._extract_fid_from_fev_pdf(fev_bytes) if fev_bytes else None
+            return None, None
+        return self._extract_fev_data(fev_bytes)
+
+    @staticmethod
+    def _numero_no_corresponde(numero_pdf, invoice_id):
         if numero_pdf and numero_pdf != (str(invoice_id).lstrip('0') or '0'):
             return numero_pdf
         return None
+
+    def _fev_invoice_mismatch(self, location, invoice_id):
+        """Número del FEV si NO corresponde con la factura; None si coincide o no se puede leer."""
+        numero_pdf, _ = self._read_fev(location)
+        return self._numero_no_corresponde(numero_pdf, invoice_id)
+
+    @classmethod
+    def _crc_exigido(cls, fecha_factura):
+        # Si no se pudo leer la fecha se exige (criterio estricto).
+        return fecha_factura is None or fecha_factura >= cls.CRC_EXIGIDO_DESDE
+
+    @classmethod
+    def _tiene_soporte_clinico(cls, pdf_names):
+        return any(re.match(r'^(HEV|PDX)[\s\-_]', Path(n).name, re.IGNORECASE) for n in pdf_names)
 
     @staticmethod
     def _duplicate_message(matches, search_root):
@@ -686,8 +724,10 @@ class InvoiceAuditor(ctk.CTk):
                     es_ubicacion_equivocada = self._is_wrong_invoice_location(final_path)
 
             numero_en_fev = None
+            fecha_factura = None
             if final_path and not es_ubicacion_equivocada:
-                numero_en_fev = self._fev_invoice_mismatch(final_path, fid)
+                numero_pdf, fecha_factura = self._read_fev(final_path)
+                numero_en_fev = self._numero_no_corresponde(numero_pdf, fid)
 
             if len(matches) > 1:
                 msg = self._duplicate_message(matches, search_root)
@@ -763,7 +803,8 @@ class InvoiceAuditor(ctk.CTk):
                     missing_required = self.NUEVA_EPS_REQUERIDOS
                 else:
                     count, invalid_count, missing_required, required_count = (
-                        self._validate_nueva_eps_pdfs(pdf_names, fid)
+                        self._validate_nueva_eps_pdfs(
+                            pdf_names, fid, exigir_crc=self._crc_exigido(fecha_factura))
                     )
 
                 if invalid_count:
@@ -999,6 +1040,13 @@ class InvoiceAuditor(ctk.CTk):
                             fill = self.fills['AMARILLO']
                     else:
                         msg = f"REVISAR ({count})"
+                        fill = self.fills['AMARILLO']
+
+                    # Manual de radicación: debe ir HEV o PDX (al menos uno).
+                    if (fill is self.fills['VERDE']
+                            and empresa in self.EMPRESAS_EXIGEN_HEV_O_PDX
+                            and not self._tiene_soporte_clinico(pdf_files_list)):
+                        msg = f"FALTA {self.SOPORTE_CLINICO_LABEL}"
                         fill = self.fills['AMARILLO']
 
             is_sobre_costo = False

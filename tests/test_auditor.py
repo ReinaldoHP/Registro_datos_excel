@@ -95,6 +95,8 @@ class AuditorIntegrationTests(unittest.TestCase):
 
         # POLICÍA va dentro de CONSULTA EXTERNA y no exige 7 dígitos.
         self.assertEqual(self.resultado(df, "HSVE000300"), "SIN RADICAR")
+        # Manual de radicación: sin HEV ni PDX no queda lista.
+        self.assertEqual(self.resultado(df, "HSVE000700"), "FALTA HEV/PDX")
         # Carpeta con letras fuera de PENDIENTE.
         self.assertEqual(self.resultado(df, "HSVE000200"), "UBICACIÓN EQUIVOCADA")
         # Carpeta con letras dentro de PENDIENTE: estado azul con la descripción.

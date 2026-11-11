@@ -243,9 +243,17 @@ const NUEVA_EPS_ALLOWED = new Set([
   'FEV', 'HEV', 'EPI', 'PDX', 'DQX', 'RAN', 'TAP', 'FMO',
   'OPF', 'LDP', 'HAU', 'HAM', 'PDE', 'CRC',
 ]);
-// Circular N°001 de 2026 (Res. 2284/2023): CRC se exige igual que LDP.
+// Circular N°001 de 2026 (Res. 2284/2023): CRC se exige igual que LDP,
+// pero solo para facturas con fecha FEV desde CRC_REQUIRED_FROM (o fecha desconocida).
 const NUEVA_EPS_REQUIRED = new Set(['FEV', 'OPF', 'PDE', 'LDP', 'CRC']);
 const NUEVA_EPS_NOT_COUNTED = new Set(['LDP', 'CRC']);
+const CRC_REQUIRED_FROM = { year: 2026, month: 11, day: 11 };
+// Al menos uno de estos soportes es obligatorio.
+const HEV_PDX_TYPES = ['HEV', 'PDX'];
+const HEV_PDX_LABEL = 'HEV/PDX';
+const HEV_PDX_COMPANIES = new Set([
+  'General', 'COOSALUD / SANIDAD MILITAR', 'SEGUROS BOLIVAR ARL', 'SURA EPS / SURA ARL',
+]);
 const STATUS_COLORS = {
   green: '99FF99',
   blue: '99CCFF',
@@ -740,7 +748,14 @@ function applyOverCost(result, totalValue) {
   return statusResult(`SOBRE COSTO - ${result.message}`, color);
 }
 
-function auditNuevaEps(files, invoiceId) {
+// Compara solo año/mes/día. Sin fecha (null) se exige CRC (criterio estricto).
+function isCrcRequired(fevDate) {
+  if (!fevDate) return true;
+  const key = (date) => date.year * 10000 + date.month * 100 + date.day;
+  return key(fevDate) >= key(CRC_REQUIRED_FROM);
+}
+
+function auditNuevaEps(files, invoiceId, fevDate = null) {
   const validSupports = new Set();
   let invalidCount = 0;
   files.filter((file) => /\.pdf$/i.test(file.name)).forEach((file) => {
@@ -758,7 +773,11 @@ function auditNuevaEps(files, invoiceId) {
     validSupports.add(supportType);
   });
   const counted = [...validSupports].filter((type) => !NUEVA_EPS_NOT_COUNTED.has(type)).length;
-  const missing = [...NUEVA_EPS_REQUIRED].filter((type) => !validSupports.has(type)).sort();
+  const crcRequired = isCrcRequired(fevDate);
+  const missing = [...NUEVA_EPS_REQUIRED]
+    .filter((type) => (type !== 'CRC' || crcRequired) && !validSupports.has(type));
+  if (!HEV_PDX_TYPES.some((type) => validSupports.has(type))) missing.push(HEV_PDX_LABEL);
+  missing.sort();
   if (invalidCount) return statusResult(`MAL SOPORTADO (${invalidCount} PDF)`, 'orange');
   if (missing.length || counted < 4) {
     const detail = missing.length ? `; faltan ${missing.join(', ')}` : '';
@@ -768,7 +787,7 @@ function auditNuevaEps(files, invoiceId) {
 }
 
 function ruleForCompany(company, files, path, invoiceId) {
-  const pdfs = files.filter((file) => /\.pdf$/i.test(file.name) && !/^(LDP|CRC)_/i.test(file.name));
+  const pdfs = companyRulePdfs(files);
   const pdfNames = pdfs.map((file) => file.name.toUpperCase());
   const xmlCount = files.filter((file) => /\.xml$/i.test(file.name)
     || (/^AD/i.test(file.name) && !/\.pdf$/i.test(file.name))).length;
@@ -831,8 +850,20 @@ function ruleForCompany(company, files, path, invoiceId) {
   return statusResult(`REVISAR (${count})`, 'yellow');
 }
 
+function companyRulePdfs(files) {
+  return files.filter((file) => /\.pdf$/i.test(file.name) && !/^(LDP|CRC)_/i.test(file.name));
+}
+
+// Tras la regla de la empresa: un resultado verde sin HEV ni PDX pasa a amarillo.
+function applyHevPdxRule(result, company, files) {
+  if (!HEV_PDX_COMPANIES.has(company) || result.color !== 'green') return result;
+  const hasHevPdx = companyRulePdfs(files).some((file) => /^(HEV|PDX)[\s\-_]/i.test(file.name));
+  return hasHevPdx ? result : statusResult('FALTA HEV/PDX', 'yellow');
+}
+
 const PDFJS_WORKER_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 const FEV_NUMBER_PATTERN = /FACTURA\s+ELECTR[OÓ]NICA\s+DE\s+VENTA\s+No\.?\s*(\d+)/i;
+const FEV_DATE_PATTERN = /Fecha:\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/i;
 
 function getPdfLib() {
   const lib = window.pdfjsLib;
@@ -848,6 +879,18 @@ function invoiceNumberFromText(text) {
   const normalized = String(text ?? '').replace(/\s+/g, ' ');
   const match = normalized.match(FEV_NUMBER_PATTERN);
   return match ? normalizeDigits(match[1]) : null;
+}
+
+// Fecha de la FEV en formato colombiano DÍA/MES/AÑO ("Fecha: 1/06/2026 6:15:10 a. m." = 1 de junio).
+function invoiceDateFromText(text) {
+  const match = String(text ?? '').replace(/\s+/g, ' ').match(FEV_DATE_PATTERN);
+  if (!match) return null;
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  const check = new Date(year, month - 1, day);
+  if (check.getFullYear() !== year || check.getMonth() !== month - 1 || check.getDate() !== day) return null;
+  return { year, month, day };
 }
 
 function findFevFile(folderFiles) {
@@ -866,14 +909,15 @@ async function readSupportFileBytes(file) {
   return null;
 }
 
-// Devuelve el número de factura impreso en el PDF FEV o null si no se puede determinar.
-async function readFevInvoiceNumber(file) {
+// Lee el PDF FEV una sola vez y devuelve { number, date }; cada campo es null si no se determina.
+async function readFevInfo(file) {
+  const empty = { number: null, date: null };
   const lib = getPdfLib();
-  if (!lib) return null;
+  if (!lib) return empty;
   let pdf = null;
   try {
     const data = await readSupportFileBytes(file);
-    if (!data) return null;
+    if (!data) return empty;
     pdf = await lib.getDocument({ data }).promise;
     const texts = [];
     for (let pageNumber = 1; pageNumber <= Math.min(2, pdf.numPages); pageNumber += 1) {
@@ -881,9 +925,10 @@ async function readFevInvoiceNumber(file) {
       const content = await page.getTextContent();
       texts.push(content.items.map((item) => item.str || '').join(' '));
     }
-    return invoiceNumberFromText(texts.join(' '));
+    const text = texts.join(' ');
+    return { number: invoiceNumberFromText(text), date: invoiceDateFromText(text) };
   } catch (error) {
-    return null;
+    return empty;
   } finally {
     if (pdf) pdf.destroy().catch(() => {});
   }
@@ -919,11 +964,9 @@ async function auditInvoice(invoiceValue, company, totalValue) {
     ? matches
     : supportFiles.filter((file) => file.path.startsWith(`${path}/`) || file.path.startsWith(`${path}\\`));
   const fevFile = findFevFile(folderFiles);
-  if (fevFile) {
-    const pdfNumber = await readFevInvoiceNumber(fevFile);
-    if (pdfNumber !== null && pdfNumber !== normalizeDigits(invoiceId)) {
-      return finish(statusResult(`FACTURA NO CORRESPONDE (PDF: ${pdfNumber})`, 'orange'));
-    }
+  const fevInfo = fevFile ? await readFevInfo(fevFile) : { number: null, date: null };
+  if (fevInfo.number !== null && fevInfo.number !== normalizeDigits(invoiceId)) {
+    return finish(statusResult(`FACTURA NO CORRESPONDE (PDF: ${fevInfo.number})`, 'orange'));
   }
 
   if (company === 'SANITAS') {
@@ -936,12 +979,12 @@ async function auditInvoice(invoiceValue, company, totalValue) {
   if (company === 'NUEVA EPS' && /[a-z]/i.test(name)) {
     return finish(statusResult(pendingDescription(path, invoiceId), 'blue'));
   }
-  if (company === 'NUEVA EPS') return finish(auditNuevaEps(folderFiles, invoiceId));
+  if (company === 'NUEVA EPS') return finish(auditNuevaEps(folderFiles, invoiceId, fevInfo.date));
   if (/[a-z]/i.test(name) && !company.includes('SURA') && !name.toUpperCase().includes('FAC_')) {
     return finish(statusResult(pendingDescription(path, invoiceId), 'blue'));
   }
 
-  return finish(ruleForCompany(company, folderFiles, path, invoiceId));
+  return finish(applyHevPdxRule(ruleForCompany(company, folderFiles, path, invoiceId), company, folderFiles));
 }
 
 function colorCell(cell, color) {

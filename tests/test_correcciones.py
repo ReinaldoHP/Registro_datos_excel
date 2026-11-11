@@ -2,6 +2,7 @@ import sys
 import tempfile
 import unittest
 import zipfile
+from datetime import date
 from pathlib import Path
 from unittest.mock import patch
 
@@ -85,6 +86,28 @@ class FevInvoiceNumberTests(unittest.TestCase):
         folder = self.root / "800218979_2197025"
         folder.mkdir()
         self.assertIsNone(self.auditor._fev_invoice_mismatch(folder, "2197025"))
+
+
+class FevTextTests(unittest.TestCase):
+    def test_number_and_day_month_year_date(self):
+        numero, fecha = InvoiceAuditor._parse_fev_text(
+            "DIRECCION. Fecha: 1/06/2026 6:15:10 a. m. USUARIO: X\n"
+            "FACTURA ELECTRONICA DE VENTA No.   2175726 Cufe: aa70")
+        self.assertEqual(numero, "2175726")
+        self.assertEqual(fecha, date(2026, 6, 1))
+
+    def test_missing_data_returns_none(self):
+        self.assertEqual(InvoiceAuditor._parse_fev_text("sin datos"), (None, None))
+
+    def test_crc_required_from_circular_date(self):
+        self.assertFalse(InvoiceAuditor._crc_exigido(date(2026, 11, 10)))
+        self.assertTrue(InvoiceAuditor._crc_exigido(date(2026, 11, 11)))
+        self.assertTrue(InvoiceAuditor._crc_exigido(None))
+
+    def test_clinical_support_detection(self):
+        self.assertTrue(InvoiceAuditor._tiene_soporte_clinico(["FEV_1_2.pdf", "PDX_800218979_2.pdf"]))
+        self.assertTrue(InvoiceAuditor._tiene_soporte_clinico(["dir/HEV_800218979_2.pdf"]))
+        self.assertFalse(InvoiceAuditor._tiene_soporte_clinico(["FEV_1_2.pdf", "EPI_1_2.pdf", "HEVX.pdf"]))
 
 
 class DuplicateMessageTests(unittest.TestCase):

@@ -15,7 +15,8 @@ def preparar_entorno(base_dir=None):
     config = {
         "100": {"tipo": "Normal", "pdfs": 4, "subfolder": ""},
         "200_AZUL": {"tipo": "Azul", "pdfs": 4, "subfolder": ""},
-        "300": {"tipo": "Policia", "pdfs": 4, "subfolder": "CONSULTA EXTERNA/POLICIA"},
+        "300": {"tipo": "Policia", "pdfs": 4, "subfolder": "CONSULTA EXTERNA/POLICIA", "extra": ["HEV_800218979_300.pdf"]},
+        "700": {"tipo": "Sin HEV ni PDX", "pdfs": 4, "subfolder": "CONSULTA EXTERNA/POLICIA"},
         "400": {"tipo": "Incompleto", "pdfs": 2, "subfolder": ""},
         "500": {"tipo": "Duplicado1", "pdfs": 4, "subfolder": "ZONA_NORTE"},
         "500_DUPLICADO": {"tipo": "Duplicado2", "pdfs": 4, "subfolder": "ZONA_SUR"},
@@ -27,6 +28,8 @@ def preparar_entorno(base_dir=None):
         folder_path = base_test / data["subfolder"] / name
         for i in range(data["pdfs"]):
             crear_pdf_falso(folder_path / f"soporte_{i+1}.pdf")
+        for extra in data.get("extra", []):
+            crear_pdf_falso(folder_path / extra)
             
     # Crear Estructura de Colsanitas
     colsanitas_base = base_test / "COLSANITAS"
@@ -44,6 +47,7 @@ def preparar_entorno(base_dir=None):
         "HSVE000400", 
         "HSVE000500", 
         "HSVE000600", # Pendiente con texto dentro de PENDIENTE
+        "HSVE000700", # Policía sin HEV ni PDX
         "HSVE000999", # No existe
         "HSVE2127892", # Colsanitas Completo
         "HSVE2127893", # Colsanitas Faltan Soportes
@@ -51,7 +55,7 @@ def preparar_entorno(base_dir=None):
         "HSVE212789"   # Colsanitas Coincidencia Parcial (Debe ser NO CARPETA)
     ]
     
-    df = pd.DataFrame({"SFANUMFAC": facturas, "TOTAL_FACTURADO": [100000, 200000, 300000, 400000, 500000, 550000, 600000, 700000, 800000, 900000, 1000000]})
+    df = pd.DataFrame({"SFANUMFAC": facturas, "TOTAL_FACTURADO": [100000, 200000, 300000, 400000, 500000, 550000, 570000, 600000, 700000, 800000, 900000, 1000000]})
     excel_path = base_test / "excel_de_prueba.xlsx"
     df.to_excel(excel_path, index=False)
     

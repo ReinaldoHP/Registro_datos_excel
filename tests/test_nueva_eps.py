@@ -35,7 +35,7 @@ class NuevaEpsValidationTests(unittest.TestCase):
             self.invoice_id,
         )
 
-        self.assertEqual(result, (3, 0, set(), 4))
+        self.assertEqual(result, (3, 0, {"HEV/PDX"}, 4))
 
     def test_missing_required_type_is_reported(self):
         result = InvoiceAuditor._validate_nueva_eps_pdfs(
@@ -76,7 +76,7 @@ class NuevaEpsValidationTests(unittest.TestCase):
             self.invoice_id,
         )
 
-        self.assertEqual(result, (1, 1, {"OPF", "PDE", "LDP", "CRC"}, 4))
+        self.assertEqual(result, (1, 1, {"OPF", "PDE", "LDP", "CRC", "HEV/PDX"}, 4))
 
     def test_wrong_invoice_number_is_invalid(self):
         result = InvoiceAuditor._validate_nueva_eps_pdfs(
@@ -107,7 +107,7 @@ class NuevaEpsValidationTests(unittest.TestCase):
             self.invoice_id,
         )
 
-        self.assertEqual(result, (3, 1, set(), 4))
+        self.assertEqual(result, (3, 1, {"HEV/PDX"}, 4))
 
     def test_pending_folder_in_pending_location_uses_pending_rule(self):
         pending_path = Path("C:/Soportes/PENDIENTE/2175724 PTE LAB")
@@ -129,6 +129,37 @@ class NuevaEpsValidationTests(unittest.TestCase):
 
         self.assertFalse(InvoiceAuditor._is_wrong_invoice_location(correct_path))
         self.assertTrue(InvoiceAuditor._is_wrong_invoice_location(misplaced_path))
+
+
+    def test_pdx_alone_satisfies_clinical_support(self):
+        result = InvoiceAuditor._validate_nueva_eps_pdfs(
+            [
+                f"FEV_{self.nit}_{self.invoice_id}.pdf",
+                f"OPF_{self.nit}_{self.invoice_id}.pdf",
+                f"PDE_{self.nit}_{self.invoice_id}.pdf",
+                f"PDX_{self.nit}_{self.invoice_id}.pdf",
+                f"LDP_{self.nit}_{self.invoice_id}.pdf",
+                f"CRC_{self.nit}_{self.invoice_id}.pdf",
+            ],
+            self.invoice_id,
+        )
+
+        self.assertEqual(result, (4, 0, set(), 4))
+
+    def test_crc_not_required_before_circular(self):
+        result = InvoiceAuditor._validate_nueva_eps_pdfs(
+            [
+                f"FEV_{self.nit}_{self.invoice_id}.pdf",
+                f"OPF_{self.nit}_{self.invoice_id}.pdf",
+                f"PDE_{self.nit}_{self.invoice_id}.pdf",
+                f"HEV_{self.nit}_{self.invoice_id}.pdf",
+                f"LDP_{self.nit}_{self.invoice_id}.pdf",
+            ],
+            self.invoice_id,
+            exigir_crc=False,
+        )
+
+        self.assertEqual(result, (4, 0, set(), 4))
 
 
 if __name__ == "__main__":
