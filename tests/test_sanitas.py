@@ -27,6 +27,20 @@ class SanitasValidationTests(unittest.TestCase):
 
         self.assertTrue(InvoiceAuditor._validate_sanitas_zip(self.zip_path, self.invoice_id))
 
+    def test_zip_requires_hev_or_pdx(self):
+        self.write_zip([
+            ("FEV_800218979_2175737.pdf", b"pdf"),
+            ("DQX_800218979_2175737.pdf", b"pdf"),
+        ])
+        self.assertFalse(InvoiceAuditor._sanitas_zip_has_clinical_support(self.zip_path))
+
+    def test_zip_with_pdx_has_clinical_support(self):
+        self.write_zip([
+            ("FEV_800218979_2175737.pdf", b"pdf"),
+            ("PDX_800218979_2175737.pdf", b"pdf"),
+        ])
+        self.assertTrue(InvoiceAuditor._sanitas_zip_has_clinical_support(self.zip_path))
+
     def test_zip_with_nested_pdf_is_invalid(self):
         self.write_zip([("SUBCARPETA/FEV_800218979_2175737.pdf", b"pdf")])
 

@@ -388,6 +388,15 @@ class InvoiceAuditor(ctk.CTk):
                 for member in members
             )
 
+    @classmethod
+    def _sanitas_zip_has_clinical_support(cls, zip_path):
+        """Sanitas también exige HEV o PDX dentro del ZIP."""
+        try:
+            with zipfile.ZipFile(zip_path, "r") as archive:
+                return cls._tiene_soporte_clinico(archive.namelist())
+        except (OSError, zipfile.BadZipFile):
+            return False
+
     @staticmethod
     def _pending_invoice_description(invoice_path, invoice_id):
         description = invoice_path.stem.upper().replace(invoice_id, "")
@@ -745,12 +754,15 @@ class InvoiceAuditor(ctk.CTk):
                     print(f"[ERROR] No se pudo validar ZIP de Sanitas {final_path}: {exc}")
                     valid_zip = False
 
-                if valid_zip:
-                    msg = "SIN RADICAR"
-                    fill = self.fills['VERDE']
-                else:
+                if not valid_zip:
                     msg = "MAL SOPORTADO"
                     fill = self.fills['NARANJA']
+                elif not self._sanitas_zip_has_clinical_support(final_path):
+                    msg = f"FALTA {self.SOPORTE_CLINICO_LABEL}"
+                    fill = self.fills['AMARILLO']
+                else:
+                    msg = "SIN RADICAR"
+                    fill = self.fills['VERDE']
             elif empresa == "COLSANITAS (PREPAGADA)":
                 clean_fid = fid.upper().strip().lstrip('0')
                 

@@ -970,9 +970,13 @@ async function auditInvoice(invoiceValue, company, totalValue) {
   }
 
   if (company === 'SANITAS') {
-    return finish(isValidSanitasZip(path, invoiceId)
+    if (!isValidSanitasZip(path, invoiceId)) return finish(statusResult('MAL SOPORTADO', 'orange'));
+    // Sanitas también exige HEV o PDX dentro del ZIP.
+    const entries = supportArchives.get(path)?.entries || [];
+    const hasClinical = entries.some((entry) => /^(HEV|PDX)[\s\-_]/i.test(entry.name));
+    return finish(hasClinical
       ? statusResult('SIN RADICAR', 'green')
-      : statusResult('MAL SOPORTADO', 'orange'));
+      : statusResult('FALTA HEV/PDX', 'yellow'));
   }
 
   const name = path.split(/[\\/]/).filter(Boolean).pop() || '';
