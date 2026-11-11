@@ -1,6 +1,6 @@
 @echo off
 cd /d "%~dp0"
-set "APP_EXE=%~dp0dist\auditor_facturas v2.0.13.exe"
+set "APP_EXE=%~dp0dist\auditor_facturas v2.0.14.exe"
 if exist "%APP_EXE%" (
     start "" "%APP_EXE%"
     exit /b 0

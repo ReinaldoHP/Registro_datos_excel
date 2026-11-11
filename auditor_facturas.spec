@@ -22,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='auditor_facturas v2.0.13',
+    name='auditor_facturas v2.0.14',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

@@ -5,7 +5,7 @@ Proyecto: Auditor de Facturas Excel
 Año: 2026
 ------------------------------------------------------------------------------
 "sistema": "Control de Órdenes de Servicio"
-"version": "2.0.13"
+"version": "2.0.14"
 "desarrollador": "Reinaldo Hurtado"
 ==============================================================================
 """
@@ -69,7 +69,7 @@ class InvoiceAuditor(ctk.CTk):
 
     def __init__(self):
         super().__init__()
-        self.title("Auditor Factura - Configuración de Reglas (v2.0.13)")
+        self.title("Auditor Factura - Configuración de Reglas (v2.0.14)")
         self.geometry("1000x550")
         self.configure(fg_color="#0F172A") # Fondo principal super oscuro #0F172A (aprox a #111827)
         
@@ -146,7 +146,7 @@ class InvoiceAuditor(ctk.CTk):
         firma_texto = (
             "Autor: Reinaldo Hurtado\n"
             "Sistema: Control de Órdenes de Servicio\n"
-            "Versión: 2.0.13\n"
+            "Versión: 2.0.14\n"
             "Desarrollador: Reinaldo Hurtado\n"
             "Año: 2026"
         )
@@ -158,7 +158,7 @@ class InvoiceAuditor(ctk.CTk):
         self.main_content.grid(row=0, column=1, sticky="nswe", padx=40, pady=30)
         
         # Título Arriba
-        lbl_header = ctk.CTkLabel(self.main_content, text="Auditor Factura - Configuración de Reglas (v2.0.13)",
+        lbl_header = ctk.CTkLabel(self.main_content, text="Auditor Factura - Configuración de Reglas (v2.0.14)",
                                   font=ctk.CTkFont(size=14, weight="normal"), text_color="#94A3B8")
         lbl_header.pack(anchor="w", pady=(0, 20))
 
