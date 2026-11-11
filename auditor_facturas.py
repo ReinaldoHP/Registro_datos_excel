@@ -5,7 +5,7 @@ Proyecto: Auditor de Facturas Excel
 Año: 2026
 ------------------------------------------------------------------------------
 "sistema": "Control de Órdenes de Servicio"
-"version": "2.0.12"
+"version": "2.0.13"
 "desarrollador": "Reinaldo Hurtado"
 ==============================================================================
 """
@@ -84,7 +84,7 @@ class InvoiceAuditor(ctk.CTk):
 
     def __init__(self):
         super().__init__()
-        self.title("Auditor Factura - Configuración de Reglas (v2.0.12)")
+        self.title("Auditor Factura - Configuración de Reglas (v2.0.13)")
         self.geometry("1000x550")
         self.configure(fg_color="#0F172A") # Fondo principal super oscuro #0F172A (aprox a #111827)
         
@@ -111,6 +111,7 @@ class InvoiceAuditor(ctk.CTk):
             "ADRES",
             "COOSALUD / SANIDAD MILITAR",
             "COLSANITAS (PREPAGADA)",
+            "SANITAS",
             "GRUPO SOLIDARIA (Solidaria, Axa ARL, Bolivar SOAT, Zurich)",
             "SEGUROS BOLIVAR ARL",
             "GRUPO ESTADO (Estado, HDI, Mapfre, Sura SOAT, Colmena)",
@@ -160,7 +161,7 @@ class InvoiceAuditor(ctk.CTk):
         firma_texto = (
             "Autor: Reinaldo Hurtado\n"
             "Sistema: Control de Órdenes de Servicio\n"
-            "Versión: 2.0.12\n"
+            "Versión: 2.0.13\n"
             "Desarrollador: Reinaldo Hurtado\n"
             "Año: 2026"
         )
@@ -172,7 +173,7 @@ class InvoiceAuditor(ctk.CTk):
         self.main_content.grid(row=0, column=1, sticky="nswe", padx=40, pady=30)
         
         # Título Arriba
-        lbl_header = ctk.CTkLabel(self.main_content, text="Auditor Factura - Configuración de Reglas (v2.0.12)",
+        lbl_header = ctk.CTkLabel(self.main_content, text="Auditor Factura - Configuración de Reglas (v2.0.13)",
                                   font=ctk.CTkFont(size=14, weight="normal"), text_color="#94A3B8")
         lbl_header.pack(anchor="w", pady=(0, 20))
 
@@ -365,6 +366,31 @@ class InvoiceAuditor(ctk.CTk):
         if has_letters_in_name:
             return not any("PENDIENTE" in part for part in path_parts)
         return not any("CONSULTA EXTERNA" in part for part in path_parts)
+
+    @staticmethod
+    def _is_wrong_sanitas_location(invoice_path):
+        path_parts = {part.upper() for part in invoice_path.parts}
+        return not {"SANITAS", "CONSULTA EXTERNA"}.issubset(path_parts)
+
+    @staticmethod
+    def _validate_sanitas_zip(zip_path, invoice_id):
+        if zip_path.suffix.lower() != ".zip":
+            return False
+
+        match = re.fullmatch(r"(\d+)_(\d+)", zip_path.stem)
+        if not match or (match.group(2).lstrip("0") or "0") != (
+                str(invoice_id).lstrip("0") or "0"):
+            return False
+
+        with zipfile.ZipFile(zip_path, "r") as archive:
+            members = archive.infolist()
+            return bool(members) and all(
+                not member.is_dir()
+                and "/" not in member.filename
+                and "\\" not in member.filename
+                and Path(member.filename).suffix.lower() == ".pdf"
+                for member in members
+            )
 
     @staticmethod
     def _pending_invoice_description(invoice_path, invoice_id):
@@ -672,7 +698,10 @@ class InvoiceAuditor(ctk.CTk):
 
             es_ubicacion_equivocada = False
             if final_path:
-                es_ubicacion_equivocada = self._is_wrong_invoice_location(final_path)
+                if empresa == "SANITAS":
+                    es_ubicacion_equivocada = self._is_wrong_sanitas_location(final_path)
+                else:
+                    es_ubicacion_equivocada = self._is_wrong_invoice_location(final_path)
 
             if not final_path and matches and len(matches) > 1:
                 msg = "DUPLICADO"
@@ -680,6 +709,19 @@ class InvoiceAuditor(ctk.CTk):
             elif es_ubicacion_equivocada:
                 msg = "UBICACIÓN EQUIVOCADA"
                 fill = self.fills['MARRON_CLARO']
+            elif empresa == "SANITAS" and final_path:
+                try:
+                    valid_zip = self._validate_sanitas_zip(final_path, fid)
+                except (OSError, zipfile.BadZipFile) as exc:
+                    print(f"[ERROR] No se pudo validar ZIP de Sanitas {final_path}: {exc}")
+                    valid_zip = False
+
+                if valid_zip:
+                    msg = "SIN RADICAR"
+                    fill = self.fills['VERDE']
+                else:
+                    msg = "MAL SOPORTADO"
+                    fill = self.fills['NARANJA']
             elif empresa == "COLSANITAS (PREPAGADA)":
                 clean_fid = fid.upper().strip().lstrip('0')
                 
